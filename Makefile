@@ -50,12 +50,12 @@ node_g: config.gypi out/Makefile
 	ln -fs out/Debug/node $@
 endif
 
-out/Makefile: common.gypi deps/uv/uv.gyp deps/http_parser/http_parser.gyp deps/zlib/zlib.gyp deps/v8/build/toolchain.gypi deps/v8/build/features.gypi deps/v8/tools/gyp/v8.gyp node.gyp config.gypi
+out/Makefile: common.gypi deps/uv/uv.gyp deps/http_parser/http_parser.gyp deps/zlib/zlib.gyp third_party/v8/build/toolchain.gypi third_party/v8/build/features.gypi third_party/v8/tools/gyp/v8.gyp build/mordor_v8.gyp config.gypi
 ifeq ($(USE_NINJA),1)
 	touch out/Makefile
-	$(PYTHON) tools/gyp_node.py -f ninja
+	$(PYTHON) build/gyp_mordor_v8.py -f ninja
 else
-	$(PYTHON) tools/gyp_node.py -f make
+	$(PYTHON) build/gyp_mordor_v8.py -f make
 endif
 
 config.gypi: configure
@@ -305,7 +305,7 @@ $(TARBALL): release-only node doc
 	mkdir -p $(TARNAME)/doc/api
 	cp doc/node.1 $(TARNAME)/doc/node.1
 	cp -r out/doc/api/* $(TARNAME)/doc/api/
-	rm -rf $(TARNAME)/deps/v8/test # too big
+	rm -rf $(TARNAME)/third_party/v8/test # too big
 	rm -rf $(TARNAME)/doc/images # too big
 	find $(TARNAME)/ -type l | xargs rm # annoying on windows
 	tar -cf $(TARNAME).tar $(TARNAME)

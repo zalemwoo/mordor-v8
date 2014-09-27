@@ -14,6 +14,7 @@
     'node_shared_openssl%': 'false',
     'node_use_mdb%': 'false',
     'node_v8_options%': '',
+    'v8_postmortem_support': 'false'
   },
 
   'targets': [
@@ -22,13 +23,16 @@
       'type': 'none',
       'dependencies': [
         '../third_party/mordor-base/gyp/mordor.gyp:mordor_base',
+        '../third_party/v8/tools/gyp/v8.gyp:v8',
       ],
     },
     {
-      'target_name': 'mordor_test',
+      'target_name': 'test_bin',
       'type': 'none',
       'dependencies': [
         '../third_party/mordor-base/gyp/mordor.gyp:tests_base',
+        '../third_party/v8/src/d8.gyp:d8',
+        '../third_party/v8/samples/samples.gyp:*',
       ],
     },
   ],
