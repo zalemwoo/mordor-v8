@@ -22,12 +22,13 @@ config.guess*
 autoconfig.h
 autoconfig.h.in
 autoconfig.h.in~
+config.gypi
+config.mk
 config.h.in
 config.h.in~
 config.log
 config.status
 config.sub*
-configure
 depcomp
 html
 install-sh
@@ -35,8 +36,6 @@ iphone
 lcov*
 libtool
 ltmain.sh
-Makefile
-Makefile.in
 missing
 mordor.xcodeproj/*.mode1v3
 mordor.xcodeproj/*.pbxuser
@@ -50,7 +49,7 @@ tags
 test-results/
 *~
 
-out
+**/out
 gyp/*.mk
 gyp/*.Makefile
 gyp/mordor.xcodeproj
