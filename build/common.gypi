@@ -214,8 +214,10 @@
           'GCC_ENABLE_PASCAL_STRINGS': 'NO',        # No -mpascal-strings
           'GCC_THREADSAFE_STATICS': 'NO',           # -fno-threadsafe-statics
           'PREBINDING': 'NO',                       # No -Wl,-prebind
-          'MACOSX_DEPLOYMENT_TARGET': '10.5',       # -mmacosx-version-min=10.5
+          'MACOSX_DEPLOYMENT_TARGET': '10.8',       # -mmacosx-version-min=10.8
           'USE_HEADERMAP': 'NO',
+          'CLANG_CXX_LANGUAGE_STANDARD': 'c++11',
+          'CLANG_CXX_LIBRARY': 'libc++', # libc++ requires OS X 10.7 or later
           'OTHER_CFLAGS': [
             '-fno-strict-aliasing',
           ],
