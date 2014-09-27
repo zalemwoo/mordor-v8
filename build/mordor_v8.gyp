@@ -30,9 +30,18 @@
       'target_name': 'test_bin',
       'type': 'none',
       'dependencies': [
+        'mordor_v8',
         '../third_party/mordor-base/gyp/mordor.gyp:tests_base',
         '../third_party/v8/src/d8.gyp:d8',
         '../third_party/v8/samples/samples.gyp:*',
+      ],
+    },
+    {
+      'target_name': 'mordor_shell',
+      'type': 'none',
+      'dependencies': [
+        'mordor_v8',
+        '../test/test.gyp:shell',
       ],
     },
   ],
