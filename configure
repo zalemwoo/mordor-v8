@@ -7,6 +7,11 @@ import shlex
 import subprocess
 import sys
 
+if sys.platform == 'darwin':
+	os.environ['CC']='/opt/local/bin/clang-mp-3.6'
+	os.environ['CXX']='/opt/local/bin/clang++-mp-3.6'
+	os.environ['LINK']='/opt/local/bin/clang++-mp-3.6'
+
 CC = os.environ.get('CC', 'cc')
 
 root_dir = os.path.dirname(__file__)
