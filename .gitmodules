@@ -1,0 +1,9 @@
+[submodule "third_party/v8"]
+	path = third_party/v8
+	url = https://github.com/zalemwoo/v8.git
+[submodule "third_party/mordor-base"]
+	path = third_party/mordor-base
+	url = https://github.com/zalemwoo/mordor-base.git
+[submodule "tools/gyp"]
+	path = tools/gyp
+	url = https://chromium.googlesource.com/external/gyp
