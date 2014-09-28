@@ -4,6 +4,10 @@
       'target_name': 'shell',
       'product_name': 'mordor_shell',
       'type': 'executable',
+      'dependencies': [
+        '../third_party/mordor-base/gyp/mordor.gyp:mordor_base',
+        '../third_party/v8/tools/gyp/v8.gyp:v8',
+      ],
       'include_dirs': [
         '.',
         '../third_party',

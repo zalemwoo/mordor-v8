@@ -19,18 +19,9 @@
 
   'targets': [
     {
-      'target_name': 'mordor_v8',
-      'type': 'none',
-      'dependencies': [
-        '../third_party/mordor-base/gyp/mordor.gyp:mordor_base',
-        '../third_party/v8/tools/gyp/v8.gyp:v8',
-      ],
-    },
-    {
       'target_name': 'test_bin',
       'type': 'none',
       'dependencies': [
-        'mordor_v8',
         '../third_party/mordor-base/gyp/mordor.gyp:tests_base',
         '../third_party/v8/src/d8.gyp:d8',
         '../third_party/v8/samples/samples.gyp:*',
@@ -40,7 +31,6 @@
       'target_name': 'mordor_shell',
       'type': 'none',
       'dependencies': [
-        'mordor_v8',
         '../test/test.gyp:shell',
       ],
     },
