@@ -159,7 +159,7 @@ void doMain(Scheduler& sched, int argc, char** argv, int* result)
 void runV8(int argc, char** argv, int* result)
 {
     v8::V8::InitializeICU();
-    g_platform = Mordor::platform::CreateDefaultPlatform();
+    g_platform = Mordor::platform::CreatePlatform(1);
     v8::V8::InitializePlatform(g_platform);
     v8::V8::Initialize();
     v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
@@ -287,7 +287,7 @@ void Quit(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     // If not arguments are given args[0] will yield undefined which
     // converts to the integer value 0.
-    int exit_code = args[0]->Int32Value();
+    // int exit_code = args[0]->Int32Value();
     fflush(stdout);
     fflush(stderr);
     g_running = false;

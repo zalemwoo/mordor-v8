@@ -5,7 +5,6 @@
 #include "default-platform.h"
 
 #include <algorithm>
-#include <queue>
 
 #include "v8/src/base/logging.h"
 #include "v8/src/base/platform/platform.h"
@@ -21,7 +20,7 @@ namespace platform
 
 using namespace v8;
 
-v8::Platform* CreateDefaultPlatform(int thread_pool_size)
+v8::Platform* CreatePlatform(int thread_pool_size)
 {
     DefaultPlatform* platform = new DefaultPlatform();
     platform->SetThreadPoolSize(thread_pool_size);
@@ -74,9 +73,10 @@ void DefaultPlatform::runOnBackground(v8::Task *task)
 
 bool DefaultPlatform::PumpMessageLoop(v8::Isolate* isolate)
 {
-    Task* task = NULL;
-    task->Run();
-    delete task;
+    // TODO
+//    Task* task = NULL;
+//    task->Run();
+//    delete task;
     return true;
 }
 
@@ -88,6 +88,7 @@ void DefaultPlatform::CallOnBackgroundThread(v8::Task *task, v8::Platform::Expec
 
 void DefaultPlatform::CallOnForegroundThread(v8::Isolate* isolate, v8::Task* task)
 {
+    // TODO
 }
 
 }

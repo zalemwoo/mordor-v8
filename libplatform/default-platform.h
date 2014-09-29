@@ -5,9 +5,6 @@
 #ifndef MORDOR_LIBPLATFORM_DEFAULT_PLATFORM_H_
 #define MORDOR_LIBPLATFORM_DEFAULT_PLATFORM_H_
 
-#include <map>
-#include <queue>
-#include <vector>
 #include <mutex>
 #include <memory>
 

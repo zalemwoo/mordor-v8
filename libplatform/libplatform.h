@@ -11,14 +11,14 @@ namespace Mordor {
 namespace platform {
 
 /**
- * Returns a new instance of the default v8::Platform implementation.
+ * Returns a new instance of the  Mordor::Platform implementation.
  *
  * The caller will take ownership of the returned pointer. |thread_pool_size|
  * is the number of worker threads to allocate for background jobs. If a value
  * of zero is passed, a suitable default based on the current number of
  * processors online will be chosen.
  */
-v8::Platform* CreateDefaultPlatform(int thread_pool_size = 0);
+v8::Platform* CreatePlatform(int thread_pool_size = 0);
 
 
 /**
