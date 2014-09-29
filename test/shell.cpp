@@ -359,7 +359,7 @@ int RunMain(v8::Isolate* isolate, int argc, char* argv[])
 
 void printArrow()
 {
-    std::cout << ">" << std::flush;
+    std::cout << "> " << std::flush;
 }
 
 // The read-eval-execute loop of the shell.
