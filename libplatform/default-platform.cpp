@@ -4,30 +4,91 @@
 
 #include "default-platform.h"
 
-namespace Mordor {
-namespace platform {
+#include <algorithm>
+#include <queue>
 
-v8::Platform* CreateDefaultPlatform(int thread_pool_size) {
-  DefaultPlatform* platform = new DefaultPlatform();
-  return platform;
+#include "v8/src/base/logging.h"
+#include "v8/src/base/platform/platform.h"
+#include "v8/src/base/sys-info.h"
+#include "v8/src/libplatform/worker-thread.h"
+
+#include "mordor/workerpool.h"
+
+namespace Mordor
+{
+namespace platform
+{
+
+using namespace v8;
+
+v8::Platform* CreateDefaultPlatform(int thread_pool_size)
+{
+    DefaultPlatform* platform = new DefaultPlatform();
+    platform->SetThreadPoolSize(thread_pool_size);
+    platform->EnsureInitialized();
+    return platform;
+}
+
+bool PumpMessageLoop(v8::Platform* platform, v8::Isolate* isolate)
+{
+    return reinterpret_cast<DefaultPlatform*>(platform)->PumpMessageLoop(isolate);
 }
 
 const int DefaultPlatform::kMaxThreadPoolSize = 4;
 
-DefaultPlatform::DefaultPlatform()
-    : initialized_(false), thread_pool_size_(0) {}
-
-
-DefaultPlatform::~DefaultPlatform() {
+DefaultPlatform::DefaultPlatform() :
+        initialized_(false), thread_pool_size_(0)
+{
 }
 
-
-void DefaultPlatform::CallOnBackgroundThread(v8::Task *task,
-                                             ExpectedRuntime expected_runtime) {
+DefaultPlatform::~DefaultPlatform()
+{
+    std::lock_guard<std::mutex> scopeLock(lock_);
 }
 
-
-void DefaultPlatform::CallOnForegroundThread(v8::Isolate* isolate, v8::Task* task) {
+void DefaultPlatform::SetThreadPoolSize(int thread_pool_size)
+{
+    std::lock_guard<std::mutex> scopeLock(lock_);
+    DCHECK(thread_pool_size >= 0);
+    if (thread_pool_size < 1) {
+        thread_pool_size = base::SysInfo::NumberOfProcessors();
+    }
+    thread_pool_size_ = std::max(std::min(thread_pool_size, kMaxThreadPoolSize), 1);
 }
 
-} }  // namespace Mordor::platform
+void DefaultPlatform::EnsureInitialized()
+{
+    std::lock_guard<std::mutex> scopeLock(lock_);
+    if (initialized_)
+        return;
+    initialized_ = true;
+
+    scheduler_.reset(new WorkerPool(thread_pool_size_, false));
+}
+
+void DefaultPlatform::runOnBackground(v8::Task *task)
+{
+    std::unique_ptr<Task> t(task);
+    t->Run();
+}
+
+bool DefaultPlatform::PumpMessageLoop(v8::Isolate* isolate)
+{
+    Task* task = NULL;
+    task->Run();
+    delete task;
+    return true;
+}
+
+void DefaultPlatform::CallOnBackgroundThread(v8::Task *task, v8::Platform::ExpectedRuntime expected_runtime)
+{
+    EnsureInitialized();
+    scheduler_->schedule(std::bind(&DefaultPlatform::runOnBackground, this, task));
+}
+
+void DefaultPlatform::CallOnForegroundThread(v8::Isolate* isolate, v8::Task* task)
+{
+}
+
+}
+}  // namespace Mordor::platform

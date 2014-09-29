@@ -1,7 +1,7 @@
 {
   'targets': [
     {
-      'target_name': 'lib',
+      'target_name': 'mordor_libplatform',
       'product_name': 'mordor_platform',
       'type': 'static_library',
       'dependencies': [
@@ -13,7 +13,6 @@
         '../third_party',
         '../third_party/mordor-base',
         '../third_party/v8',
-        '../third_party/v8/include',
       ],
       'sources': [
         'default-platform.cpp',

@@ -7,7 +7,7 @@
       'dependencies': [
         '../third_party/mordor-base/gyp/mordor.gyp:mordor_base',
         '../third_party/v8/tools/gyp/v8.gyp:v8',
-        '../libplatform/libplatform.gyp:lib',
+        '../libplatform/libplatform.gyp:mordor_libplatform',
       ],
       'include_dirs': [
         '.',
@@ -24,12 +24,7 @@
       'cflags_cc!': [ '-fno-rtti', '-fno-exceptions'],
       'link_settings': {
         'libraries': [
-          '-L <(PRODUCT_DIR)',
-          '-lmordor_base',
-          '-lv8_base',
-          '-lv8_snapshot',
-          '-lv8_libbase',
-#          '-lv8_libplatform',
+          '-L<(PRODUCT_DIR)',
           ],
         },
       'xcode_settings': {

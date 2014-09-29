@@ -41,10 +41,12 @@
 #include "mordor/type_name.h"
 #include "mordor/iomanager.h"
 #include "mordor/workerpool.h"
+#include "mordor/thread.h"
 #include "mordor/fiber.h"
 #include "mordor/streams/file.h"
 #include "mordor/streams/std.h"
 #include "mordor/streams/buffer.h"
+#include "mordor/sleep.h"
 
 #include "libplatform/libplatform.h"
 
@@ -77,6 +79,8 @@ v8::Handle<v8::String> ReadFile(v8::Isolate* isolate, const char* name);
 void ReportException(v8::Isolate* isolate, v8::TryCatch* handler);
 
 static bool run_shell;
+static bool g_running = true;
+static v8::Platform* g_platform = NULL;
 
 class ShellArrayBufferAllocator: public v8::ArrayBuffer::Allocator
 {
@@ -95,6 +99,31 @@ public:
         free(data);
     }
 };
+
+class TestTask: public v8::Task
+{
+public:
+    TestTask(std::function<void()>* func):TestTask(0, func){
+
+    }
+    TestTask(int exit_code, std::function<void()>* func):exit_code_(exit_code),func_(func){
+        tid_ = Mordor::gettid();
+    }
+    virtual void Run(){
+        std::cout << "TestTask::result(" << exit_code_ << "), origin tid("<< tid_ << "), runon tid("<< Mordor::gettid() << ")" << std::endl;
+
+        if(func_.get()){
+            (*func_)();
+        }
+    }
+private:
+    int exit_code_;
+    tid_t tid_;
+    std::shared_ptr<std::function<void()>> func_;
+    static int callCount;
+};
+
+int TestTask::callCount = 0;
 
 MORDOR_MAIN(int argc, char* argv[])
 {
@@ -130,8 +159,8 @@ void doMain(Scheduler& sched, int argc, char** argv, int* result)
 void runV8(int argc, char** argv, int* result)
 {
     v8::V8::InitializeICU();
-    v8::Platform* platform = Mordor::platform::CreateDefaultPlatform();
-    v8::V8::InitializePlatform(platform);
+    g_platform = Mordor::platform::CreateDefaultPlatform();
+    v8::V8::InitializePlatform(g_platform);
     v8::V8::Initialize();
     v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
     ShellArrayBufferAllocator array_buffer_allocator;
@@ -155,7 +184,7 @@ void runV8(int argc, char** argv, int* result)
 
     v8::V8::Dispose();
     v8::V8::ShutdownPlatform();
-    delete platform;
+    delete g_platform;
 }
 
 // Extracts a C string from a V8 Utf8Value.
@@ -258,10 +287,10 @@ void Quit(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     // If not arguments are given args[0] will yield undefined which
     // converts to the integer value 0.
-    // int exit_code = args[0]->Int32Value();
+    int exit_code = args[0]->Int32Value();
     fflush(stdout);
     fflush(stderr);
-    Scheduler::getThis()->yieldTo();
+    g_running = false;
 }
 
 void Version(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -328,6 +357,11 @@ int RunMain(v8::Isolate* isolate, int argc, char* argv[])
     return 0;
 }
 
+void printArrow()
+{
+    std::cout << ">" << std::flush;
+}
+
 // The read-eval-execute loop of the shell.
 void RunShell(v8::Handle<v8::Context> context)
 {
@@ -336,7 +370,7 @@ void RunShell(v8::Handle<v8::Context> context)
     v8::Context::Scope context_scope(context);
     static const int kBufferSize = 256;
     v8::Local<v8::String> name(v8::String::NewFromUtf8(context->GetIsolate(), "(shell)"));
-    while (true) {
+    while (g_running) {
         char buffer[kBufferSize];
         fprintf(stderr, "> ");
         char* str = fgets(buffer, kBufferSize, stdin);
@@ -344,6 +378,7 @@ void RunShell(v8::Handle<v8::Context> context)
             break;
         v8::HandleScope handle_scope(context->GetIsolate());
         ExecuteString(context->GetIsolate(), v8::String::NewFromUtf8(context->GetIsolate(), str), name, true, true);
+        g_platform->CallOnBackgroundThread(new TestTask(new std::function<void()>(std::bind(&printArrow))), v8::Platform::kShortRunningTask);
     }
     fprintf(stderr, "\n");
 }
