@@ -57,3 +57,4 @@ gyp/mordor.xcodeproj
 .project
 .cproject
 .settings
+/out/
