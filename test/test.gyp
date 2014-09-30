@@ -18,7 +18,9 @@
         '../third_party/v8/include',
       ],
       'sources': [
-        'shell.cpp',
+        './md_runner.cpp',
+        './md_shell.cpp',
+        './md_v8_wrapper.cpp',
       ],
       'cflags': [ '-std=c++11' ],
       'cflags_cc!': [ '-fno-rtti', '-fno-exceptions'],
