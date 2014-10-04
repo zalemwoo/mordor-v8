@@ -15,7 +15,7 @@
         '../third_party/v8',
       ],
       'sources': [
-        'default-platform.cpp',
+        'md_platform.cpp',
       ],
       'cflags': [ '-std=c++11' ],
       'cflags_cc!': [ '-fno-rtti', '-fno-exceptions'],

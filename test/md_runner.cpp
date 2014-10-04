@@ -10,13 +10,12 @@
 #include "md_runner.h"
 
 #include "mordor/type_name.h"
-#include "mordor/workerpool.h"
 #include "mordor/thread.h"
 #include "mordor/fiber.h"
+#include "mordor/coroutine.h"
 #include "mordor/streams/file.h"
 #include "mordor/streams/std.h"
 #include "mordor/streams/buffer.h"
-#include "mordor/sleep.h"
 
 #include "v8.h"
 #include "md_v8_wrapper.h"
@@ -27,45 +26,66 @@ extern char** g_argv;
 namespace Mordor {
 namespace Test {
 
-MD_Runner::MD_Runner(Scheduler& iom):iom_(iom){
-    std::function<void()> fiber_func = std::bind(&MD_Runner::run, this);
-    Fiber::ptr fiber(new Fiber(fiber_func));
-    iom_.schedule(fiber);
+static void readScript(Coroutine<const char*>& self)
+{
+    Buffer buf;
+    Stream::ptr inStream(new StdinStream());
+
+    int readed = 0;
+    do{
+        fputs("> ", stderr);
+        buf.clear(true);
+        readed = inStream->read(buf, 256);
+        if (!readed)
+            break;
+        std::string str = buf.toString();
+        if(!str.compare("q\n")){
+            break;
+        }
+        self.yield(str.c_str());
+    }while (true);
+}
+
+MD_Runner::MD_Runner(Scheduler& sched):sched_(sched){
+    sched_.schedule(std::bind(&MD_Runner::run, this));
 }
 
 MD_Runner::~MD_Runner(){
-    runtime_.reset();
 }
 
 void MD_Runner::run()
 {
     MD_V8Wrapper::Scope warpper_scope(g_argc, g_argv);
 
-    runtime_ = MD_V8Wrapper::getWrapper();
+    fprintf(stderr,"V8 version %s [sample shell]\n", v8::V8::GetVersion());
 
-    fprintf(stderr, "V8 version %s [sample shell]\n", v8::V8::GetVersion());
+    std::shared_ptr<MD_V8Wrapper> runtime;
+    runtime = warpper_scope.getWrapper();
 
-    v8::Isolate* isolate = runtime_->getIsolate();
+    v8::Isolate* isolate = runtime->getIsolate();
     {
       v8::Locker locker(isolate);
       v8::HandleScope handle_scope(isolate);
-      v8::Local<v8::Context> context = runtime_->createContext();
-      runtime_->setName("md_sample");
+      v8::Local<v8::Context> context = runtime->createContext();
       {
+        Coroutine<const char*> coReadScript(&readScript);
         v8::Context::Scope context_scope(context);
-        bool more = true;
+        const char* script;
         do {
-            char buffer[256];
-            fprintf(stderr, "> ");
-            char* str = fgets(buffer, 256, stdin);
-            if (str == NULL)
+            script = coReadScript.call();
+            if(coReadScript.state() == Fiber::State::TERM){
                 break;
+            }
             v8::HandleScope handle_scope(context->GetIsolate());
-            runtime_->execString(str,true, true);
-        } while (more && runtime_->isRunning() == true);
+            runtime->execString(script, true, true);
+        } while (runtime->isRunning());
       }
     }
-    fprintf(stderr, "\n");
+
+    fputs("bye.\n", stderr);
+    runtime.reset();
+
+    sched_.stop();
 }
 
 } }  // namespace Mordor::Test

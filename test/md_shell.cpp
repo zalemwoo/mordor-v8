@@ -64,13 +64,6 @@ using namespace Mordor;
 int g_argc = 0;
 char** g_argv = NULL;
 
-void run(Scheduler& sched, int& result)
-{
-    IOManager iom(1, false);
-    Mordor::Test::MD_Runner runner(iom);
-    result = 0;
-}
-
 MORDOR_MAIN(int argc, char* argv[])
 {
     g_argc = argc;
@@ -90,9 +83,8 @@ MORDOR_MAIN(int argc, char* argv[])
     int result = 0;
 
     WorkerPool pool;
-    pool.schedule(std::bind(&run, std::ref(pool),  std::ref(result)));
-    pool.yield();
-    pool.stop();
+    Mordor::Test::MD_Runner runner(pool);
+    pool.yieldTo();
 
     return result;
 }

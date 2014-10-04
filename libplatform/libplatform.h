@@ -8,7 +8,7 @@
 #include "v8/include/v8-platform.h"
 
 namespace Mordor {
-namespace platform {
+namespace Platform {
 
 /**
  * Returns a new instance of the  Mordor::Platform implementation.
@@ -32,7 +32,7 @@ v8::Platform* CreatePlatform(int thread_pool_size = 0);
 bool PumpMessageLoop(v8::Platform* platform, v8::Isolate* isolate);
 
 
-}  // namespace platform
+}  // namespace Platform
 }  // namespace Mordor
 
 #endif  // MORDOR_LIBPLATFORM_LIBPLATFORM_H_

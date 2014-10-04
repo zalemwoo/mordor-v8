@@ -2,13 +2,21 @@
 #include <assert.h>
 #include <iostream>
 
+#include <memory>
+#include <functional>
+
 #include "mordor/exception.h"
+#include "mordor/coroutine.h"
+#include "mordor/iomanager.h"
 #include "mordor/streams/file.h"
 #include "mordor/streams/std.h"
 #include "mordor/streams/buffer.h"
+#include "mordor/sleep.h"
 
 #include "md_v8_wrapper.h"
 #include "libplatform/libplatform.h"
+#include "libplatform/co_task.h"
+#include "libplatform/md_platform.h"
 
 /*
 static const char* g_harmony_opts = " --harmony --harmony_scoping --harmony_modules"
@@ -135,7 +143,7 @@ void ArrayBufferAllocator::Free(void* data, size_t length) {
 bool MD_V8Wrapper::s_inited_ = false;
 int MD_V8Wrapper::s_argc_ = 0;
 char** MD_V8Wrapper::s_argv_ = NULL;
-std::shared_ptr<MD_V8Wrapper> MD_V8Wrapper::s_curr_wrapper_;
+std::shared_ptr<MD_V8Wrapper> MD_V8Wrapper::s_curr_;
 std::unique_ptr<v8::Platform> MD_V8Wrapper::s_platform_;
 
 void MD_V8Wrapper::init(int argc, char** argv)
@@ -148,7 +156,7 @@ void MD_V8Wrapper::init(int argc, char** argv)
     MD_V8Wrapper::s_argv_ = argv;
 
     v8::V8::InitializeICU();
-    MD_V8Wrapper::s_platform_.reset(Mordor::platform::CreatePlatform(1));
+    MD_V8Wrapper::s_platform_.reset(Mordor::Platform::CreatePlatform(4));
     v8::V8::InitializePlatform(MD_V8Wrapper::s_platform_.get());
     v8::V8::Initialize();
     v8::V8::SetFlagsFromCommandLine(&MD_V8Wrapper::s_argc_, MD_V8Wrapper::s_argv_, true);
@@ -158,47 +166,51 @@ void MD_V8Wrapper::init(int argc, char** argv)
 
 void MD_V8Wrapper::shutdown()
 {
-    MD_V8Wrapper::s_curr_wrapper_.reset();
+    MD_V8Wrapper::s_curr_.reset();
     v8::V8::Dispose();
     v8::V8::ShutdownPlatform();
-    MD_V8Wrapper::s_platform_.reset(nullptr);
+    MD_V8Wrapper::s_platform_.reset();
 }
 
 v8::Handle<v8::Context> MD_V8Wrapper::createContext()
 {
     // Create a template for the global object.
     v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New(isolate_);
-//    // Bind the global 'print' function to the C++ Print callback.
-//    global->Set(toV8String("print"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Print));
-//    // Bind the global 'read' function to the C++ Read callback.
-//    global->Set(toV8String("read"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Read));
-//    // Bind the global 'load' function to the C++ Load callback.
-//    global->Set(toV8String("load"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Load));
+    // Bind the global 'print' function to the C++ Print callback.
+    global->Set(toV8String("print"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Print));
+    // Bind the global 'read' function to the C++ Read callback.
+    global->Set(toV8String("read"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Read));
+    // Bind the global 'load' function to the C++ Load callback.
+    global->Set(toV8String("load"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Load));
     // Bind the 'quit' function
     global->Set(toV8String("quit"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Quit));
     // Bind the 'version' function
     global->Set(toV8String("version"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Version));
 
-    curr_context_ = v8::Context::New(isolate_, NULL, global);
+    context_ = v8::Context::New(isolate_, NULL, global);
 
-    if (curr_context_.IsEmpty()) {
+    if (context_.IsEmpty()) {
         MORDOR_THROW_EXCEPTION(std::runtime_error("Error creating context"));
     }
 
-    return curr_context_;
+    return context_;
 }
 
-// Executes a string within the current v8 context.
+
+bool MD_V8Wrapper::execString(const std::string& str, bool print_result, bool report_exceptions)
+{
+    return execString(str.c_str(), print_result, report_exceptions);
+}
+
 bool MD_V8Wrapper::execString(
-        const char* source,
+        v8::Handle<v8::String> source,
         bool print_result,
         bool report_exceptions)
 {
     v8::HandleScope handle_scope(isolate_);
     v8::TryCatch try_catch;
-    v8::ScriptOrigin origin(name_);
-    v8::Handle<v8::String> src = toV8String(source);
-    v8::Handle<v8::Script> script = v8::Script::Compile(src, &origin);
+    v8::ScriptOrigin origin(toV8String(name_));
+    v8::Handle<v8::Script> script = v8::Script::Compile(source, &origin);
     if (script.IsEmpty()) {
         // Print errors that happened during compilation.
         if (report_exceptions)
@@ -226,6 +238,16 @@ bool MD_V8Wrapper::execString(
     }
 }
 
+// Executes a string within the current v8 context.
+bool MD_V8Wrapper::execString(
+        const char* source,
+        bool print_result,
+        bool report_exceptions)
+{
+    v8::Handle<v8::String> src = toV8String(source);
+    return execString(src, print_result, report_exceptions);
+}
+
 // The callback that is invoked by v8 whenever the JavaScript 'print'
 // function is called.  Prints its arguments on stdout separated by
 // spaces and ending with a newline.
@@ -233,7 +255,7 @@ void MD_V8Wrapper::Print(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     bool first = true;
     for (int i = 0; i < args.Length(); i++) {
-        v8::HandleScope handle_scope(isolate_);
+        v8::HandleScope handle_scope(args.GetIsolate());
         if (first) {
             first = false;
         } else {
@@ -252,18 +274,19 @@ void MD_V8Wrapper::Print(const v8::FunctionCallbackInfo<v8::Value>& args)
 // the argument into a JavaScript string.
 void MD_V8Wrapper::Read(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+    v8::Isolate* isolate = args.GetIsolate();
     if (args.Length() != 1) {
-        isolate_->ThrowException(toV8String("Bad parameters"));
+        isolate->ThrowException(MD_V8Wrapper::toV8String(isolate, "Bad parameters"));
         return;
     }
     v8::String::Utf8Value file(args[0]);
     if (*file == NULL) {
-        isolate_->ThrowException(toV8String("Error loading file"));
+        isolate->ThrowException(MD_V8Wrapper::toV8String(isolate, "Error loading file"));
         return;
     }
-    v8::Handle<v8::String> source = ReadFile(isolate_, *file);
+    v8::Handle<v8::String> source = ReadFile(isolate, *file);
     if (source.IsEmpty()) {
-        isolate_->ThrowException(toV8String("Error loading file"));
+        isolate->ThrowException(MD_V8Wrapper::toV8String(isolate, "Error loading file"));
         return;
     }
     args.GetReturnValue().Set(source);
@@ -272,26 +295,27 @@ void MD_V8Wrapper::Read(const v8::FunctionCallbackInfo<v8::Value>& args)
 // The callback that is invoked by v8 whenever the JavaScript 'load'
 // function is called.  Loads, compiles and executes its argument
 // JavaScript file.
-//void MD_V8Wrapper::Load(const v8::FunctionCallbackInfo<v8::Value>& args)
-//{
-//    for (int i = 0; i < args.Length(); i++) {
-//        v8::HandleScope handle_scope(isolate_);
-//        v8::String::Utf8Value file(args[i]);
-//        if (*file == NULL) {
-//            isolate_->ThrowException(toV8String("Error loading file"));
-//            return;
-//        }
-//        v8::Handle<v8::String> source = ReadFile(isolate_, *file);
-//        if (source.IsEmpty()) {
-//            isolate_->ThrowException(toV8String("Error loading file"));
-//            return;
-//        }
-//        if (!execString(source, toV8String(*file), false, false)) {
-//            isolate_->ThrowException(toV8String("Error executing file"));
-//            return;
-//        }
-//    }
-//}
+void MD_V8Wrapper::Load(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+    v8::Isolate* isolate = args.GetIsolate();
+    for (int i = 0; i < args.Length(); i++) {
+        v8::HandleScope handle_scope(isolate);
+        v8::String::Utf8Value file(args[i]);
+        if (*file == NULL) {
+            isolate->ThrowException(MD_V8Wrapper::toV8String(isolate, "Error loading file"));
+            return;
+        }
+        v8::Handle<v8::String> source = ReadFile(isolate, *file);
+        if (source.IsEmpty()) {
+            isolate->ThrowException(MD_V8Wrapper::toV8String(isolate, "Error loading file"));
+            return;
+        }
+        if (!MD_V8Wrapper::s_curr_->execString(source, false, false)) {
+            isolate->ThrowException(MD_V8Wrapper::toV8String(isolate, "Error executing file"));
+            return;
+        }
+    }
+}
 
 // The callback that is invoked by v8 whenever the JavaScript 'quit'
 // function is called.  Quits.
@@ -302,12 +326,23 @@ void MD_V8Wrapper::Quit(const v8::FunctionCallbackInfo<v8::Value>& args)
     // int exit_code = args[0]->Int32Value();
     fflush(stdout);
     fflush(stderr);
-    MD_V8Wrapper::s_curr_wrapper_->running_ = false;
+    MD_V8Wrapper::s_curr_->running_ = false;
+}
+
+static void co_version(Mordor::Platform::CoTask<const char*> &self)
+{
+    const char* ret = v8::V8::GetVersion();
+    self.setResult(ret);
 }
 
 void MD_V8Wrapper::Version(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    args.GetReturnValue().Set(v8::String::NewFromUtf8(args.GetIsolate(), v8::V8::GetVersion()));
+    v8::Isolate* isolate = args.GetIsolate();
+    Mordor::Platform::CoTask<const char*>* cotask = new Mordor::Platform::CoTask<const char*>(&co_version);
+    MD_V8Wrapper::s_platform_->CallOnBackgroundThread(cotask, v8::Platform::ExpectedRuntime::kShortRunningTask);
+    const char* ret = cotask->getResult();
+    v8::Handle<v8::String> ver = MD_V8Wrapper::toV8String(isolate, ret);
+    args.GetReturnValue().Set(ver);
 }
 
 } } // namespace Mordor::Test

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef MORDOR_LIBPLATFORM_DEFAULT_PLATFORM_H_
-#define MORDOR_LIBPLATFORM_DEFAULT_PLATFORM_H_
+#ifndef MORDOR_LIBPLATFORM_PLATFORM_H_
+#define MORDOR_LIBPLATFORM_PLATFORM_H_
 
 #include <mutex>
 #include <memory>
@@ -15,9 +15,9 @@
 
 namespace Mordor {
 
-class Scheduler;
+class IOManager;
 
-namespace platform {
+namespace Platform {
 
 class DefaultPlatform : public v8::Platform {
  public:
@@ -45,12 +45,12 @@ class DefaultPlatform : public v8::Platform {
   std::mutex lock_;
   bool initialized_;
   int thread_pool_size_;
-  std::unique_ptr<Scheduler> scheduler_;
+  std::unique_ptr<IOManager> scheduler_;
 
   DISALLOW_COPY_AND_ASSIGN(DefaultPlatform);
 };
 
-} }  // namespace Mordor::platform
+} }  // namespace Mordor::Platform
 
 
-#endif  // MORDOR_LIBPLATFORM_DEFAULT_PLATFORM_H_
+#endif  // MORDOR_LIBPLATFORM_PLATFORM_H_

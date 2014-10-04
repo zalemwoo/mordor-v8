@@ -15,14 +15,8 @@ public:
     ~MD_Runner();
 
     void run();
-
-    int getResult(){
-        return result_;
-    }
 private:
-    Scheduler& iom_;
-    std::shared_ptr<MD_V8Wrapper> runtime_;
-    int result_{0};
+    Scheduler& sched_;
 };
 
 } } // namespace Mordor::Test

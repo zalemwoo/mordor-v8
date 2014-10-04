@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "default-platform.h"
+#include "md_platform.h"
 
 #include <algorithm>
 
@@ -11,11 +11,11 @@
 #include "v8/src/base/sys-info.h"
 #include "v8/src/libplatform/worker-thread.h"
 
-#include "mordor/workerpool.h"
+#include "mordor/iomanager.h"
 
 namespace Mordor
 {
-namespace platform
+namespace Platform
 {
 
 using namespace v8;
@@ -62,7 +62,7 @@ void DefaultPlatform::EnsureInitialized()
         return;
     initialized_ = true;
 
-    scheduler_.reset(new WorkerPool(thread_pool_size_, false));
+    scheduler_.reset(new IOManager(thread_pool_size_, false));
 }
 
 void DefaultPlatform::runOnBackground(v8::Task *task)
@@ -92,4 +92,4 @@ void DefaultPlatform::CallOnForegroundThread(v8::Isolate* isolate, v8::Task* tas
 }
 
 }
-}  // namespace Mordor::platform
+}  // namespace Mordor::Platform
