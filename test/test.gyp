@@ -21,12 +21,16 @@
         './md_runner.cpp',
         './md_shell.cpp',
         './md_v8_wrapper.cpp',
+        './md_worker.cpp',
       ],
       'cflags': [ '-std=c++11' ],
       'cflags_cc!': [ '-fno-rtti', '-fno-exceptions'],
       'link_settings': {
         'libraries': [
           '-L<(PRODUCT_DIR)',
+          '-lreadline',
+          '-lhistory',
+          '-ldl',
           ],
         },
       'xcode_settings': {

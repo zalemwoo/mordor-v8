@@ -14,8 +14,9 @@
 #include "mordor/sleep.h"
 
 #include "md_v8_wrapper.h"
+#include "md_worker.h"
+#include "md_task.h"
 #include "libplatform/libplatform.h"
-#include "libplatform/co_task.h"
 #include "libplatform/md_platform.h"
 
 /*
@@ -145,6 +146,7 @@ int MD_V8Wrapper::s_argc_ = 0;
 char** MD_V8Wrapper::s_argv_ = NULL;
 std::shared_ptr<MD_V8Wrapper> MD_V8Wrapper::s_curr_;
 std::unique_ptr<v8::Platform> MD_V8Wrapper::s_platform_;
+std::unique_ptr<MD_Worker> MD_V8Wrapper::s_worker_;
 
 void MD_V8Wrapper::init(int argc, char** argv)
 {
@@ -156,7 +158,9 @@ void MD_V8Wrapper::init(int argc, char** argv)
     MD_V8Wrapper::s_argv_ = argv;
 
     v8::V8::InitializeICU();
-    MD_V8Wrapper::s_platform_.reset(Mordor::Platform::CreatePlatform(4));
+    MD_V8Wrapper::s_platform_.reset(Mordor::Platform::CreatePlatform(1));
+    MD_V8Wrapper::s_worker_.reset(CreateWorker(4));
+
     v8::V8::InitializePlatform(MD_V8Wrapper::s_platform_.get());
     v8::V8::Initialize();
     v8::V8::SetFlagsFromCommandLine(&MD_V8Wrapper::s_argc_, MD_V8Wrapper::s_argv_, true);
@@ -170,6 +174,7 @@ void MD_V8Wrapper::shutdown()
     v8::V8::Dispose();
     v8::V8::ShutdownPlatform();
     MD_V8Wrapper::s_platform_.reset();
+    MD_V8Wrapper::s_worker_.reset();
 }
 
 v8::Handle<v8::Context> MD_V8Wrapper::createContext()
@@ -183,9 +188,9 @@ v8::Handle<v8::Context> MD_V8Wrapper::createContext()
     // Bind the global 'load' function to the C++ Load callback.
     global->Set(toV8String("load"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Load));
     // Bind the 'quit' function
-    global->Set(toV8String("quit"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Quit));
+    global->Set(toV8String("q"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Quit));
     // Bind the 'version' function
-    global->Set(toV8String("version"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Version));
+    global->Set(toV8String("v"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Version));
 
     context_ = v8::Context::New(isolate_, NULL, global);
 
@@ -329,20 +334,29 @@ void MD_V8Wrapper::Quit(const v8::FunctionCallbackInfo<v8::Value>& args)
     MD_V8Wrapper::s_curr_->running_ = false;
 }
 
-static void co_version(Mordor::Platform::CoTask<const char*> &self)
+static void co_version(MD_Task<const char*> &self)
 {
     const char* ret = v8::V8::GetVersion();
+    v8::Isolate* isolate = self.getIsolate();
+    v8::Isolate::Scope isolate_scope(isolate);
+    v8::HandleScope handle_scope(isolate);
+    v8::Handle<v8::Context> context = MD_V8Wrapper::s_curr_->getContext();
+//    v8::Context::Scope context_scope(context);
+    v8::Handle<v8::String> s = MD_V8Wrapper::toV8String(isolate, "co_version");
+    v8::String::Utf8Value str(s);
+    const char* cstr = ::ToCString(str);
+    printf("%s\n", cstr);
     self.setResult(ret);
 }
 
 void MD_V8Wrapper::Version(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     v8::Isolate* isolate = args.GetIsolate();
-    Mordor::Platform::CoTask<const char*>* cotask = new Mordor::Platform::CoTask<const char*>(&co_version);
-    MD_V8Wrapper::s_platform_->CallOnBackgroundThread(cotask, v8::Platform::ExpectedRuntime::kShortRunningTask);
-    const char* ret = cotask->getResult();
-    v8::Handle<v8::String> ver = MD_V8Wrapper::toV8String(isolate, ret);
-    args.GetReturnValue().Set(ver);
+    MD_Task<const char*> task(isolate, &co_version);
+    MD_V8Wrapper::s_worker_->doTask(&task);
+    const char* result = task.getResult();
+    v8::Handle<v8::Value> ret = MD_V8Wrapper::toV8String(isolate, result);
+    args.GetReturnValue().Set(ret);
 }
 
 } } // namespace Mordor::Test

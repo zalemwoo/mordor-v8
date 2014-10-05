@@ -8,6 +8,8 @@
 namespace Mordor {
 namespace Test {
 
+class MD_Worker;
+
 class MD_V8Wrapper : public std::enable_shared_from_this<MD_V8Wrapper>
 {
 public:
@@ -120,6 +122,7 @@ private:
     static int s_argc_;
     static char** s_argv_;
     static std::unique_ptr<v8::Platform> s_platform_;
+    static std::unique_ptr<MD_Worker> s_worker_;
 };
 
 } } // namespace Mordor::Test

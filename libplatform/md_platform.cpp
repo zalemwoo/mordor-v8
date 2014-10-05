@@ -11,7 +11,7 @@
 #include "v8/src/base/sys-info.h"
 #include "v8/src/libplatform/worker-thread.h"
 
-#include "mordor/iomanager.h"
+#include "mordor/workerpool.h"
 
 namespace Mordor
 {
@@ -62,7 +62,7 @@ void DefaultPlatform::EnsureInitialized()
         return;
     initialized_ = true;
 
-    scheduler_.reset(new IOManager(thread_pool_size_, false));
+    scheduler_.reset(new WorkerPool(thread_pool_size_, false));
 }
 
 void DefaultPlatform::runOnBackground(v8::Task *task)

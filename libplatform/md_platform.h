@@ -10,12 +10,10 @@
 
 #include "v8/include/v8-platform.h"
 #include "v8/src/base/macros.h"
-#include "v8/src/base/platform/mutex.h"
-#include "v8/src/libplatform/task-queue.h"
 
 namespace Mordor {
 
-class IOManager;
+class WorkerPool;
 
 namespace Platform {
 
@@ -45,7 +43,7 @@ class DefaultPlatform : public v8::Platform {
   std::mutex lock_;
   bool initialized_;
   int thread_pool_size_;
-  std::unique_ptr<IOManager> scheduler_;
+  std::unique_ptr<WorkerPool> scheduler_;
 
   DISALLOW_COPY_AND_ASSIGN(DefaultPlatform);
 };
