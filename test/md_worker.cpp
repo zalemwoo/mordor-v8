@@ -58,7 +58,7 @@ void MD_Worker::EnsureInitialized()
 void MD_Worker::run(Task *task)
 {
     v8::Locker locker(task->getIsolate());
-    task->Run();
+    task->Call();
 }
 
 void MD_Worker::doTask(Task* task)

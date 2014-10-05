@@ -22,26 +22,12 @@ public:
     Task(v8::Isolate* isolate) :
             isolate_(isolate)
     {
+        m_fiber = Fiber::ptr(new Fiber(std::bind(&Task::run, this)));
     }
 
     virtual ~Task()
     {
         reset();
-    }
-
-    void Run()
-    {
-        m_fiber->call();
-    }
-
-    void waitEvent()
-    {
-        event_.wait();
-    }
-
-    v8::Isolate* getIsolate()
-    {
-        return isolate_;
     }
 
     void reset()
@@ -54,6 +40,26 @@ public:
             }
         }
         m_fiber->reset(std::bind(&Task::run, this));
+    }
+
+    void Call()
+    {
+        m_fiber->call();
+    }
+
+    v8::Isolate* getIsolate()
+    {
+        return isolate_;
+    }
+
+    Fiber::State state() const
+    {
+        return m_fiber->state();
+    }
+
+    void waitEvent()
+    {
+        event_.wait();
     }
 
 protected:
@@ -74,12 +80,6 @@ template<class Result, class Arg = DummyVoid>
 class MD_Task: public Task, Mordor::noncopyable
 {
 public:
-    MD_Task(v8::Isolate* isolate) :
-            Task(isolate)
-    {
-        m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
-    }
-
     MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &, Arg)> dg, const Arg &arg) :
             Task(isolate), m_dg(dg)
     {
@@ -93,22 +93,9 @@ public:
         m_dg = dg;
     }
 
-    Arg yield(const Result &result)
-    {
-        m_result = result;
-        Fiber::yield();
-        return m_arg;
-    }
-
-    Fiber::State state() const
-    {
-        return m_fiber->state();
-    }
-
     void setResult(const Result &result)
     {
         m_result = result;
-        setEvent();
     }
 
     const Result& getResult()
@@ -120,6 +107,7 @@ private:
     {
         try {
             m_dg(*this, m_arg);
+            setEvent();
         } catch (MdTaskAbortedException &) {
         }
     }
@@ -134,12 +122,6 @@ template<class Result>
 class MD_Task<Result, DummyVoid> : public Task, Mordor::noncopyable
 {
 public:
-    MD_Task(v8::Isolate* isolate) :
-            Task(isolate)
-    {
-        m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
-    }
-
     MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &)> dg) :
             Task(isolate), m_dg(dg)
     {
@@ -152,21 +134,9 @@ public:
         m_dg = dg;
     }
 
-    void yield(const Result &result)
-    {
-        m_result = result;
-        Fiber::yield();
-    }
-
-    Fiber::State state() const
-    {
-        return m_fiber->state();
-    }
-
     void setResult(const Result &result)
     {
         m_result = result;
-        setEvent();
     }
 
     const Result & getResult()
@@ -178,6 +148,7 @@ private:
     {
         try {
             m_dg(*this);
+            setEvent();
         } catch (MdTaskAbortedException &) {
         }
     }
@@ -191,12 +162,6 @@ template<class Arg>
 class MD_Task<void, Arg> : public Task, Mordor::noncopyable
 {
 public:
-    MD_Task(v8::Isolate* isolate) :
-            Task(isolate)
-    {
-        m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
-    }
-
     MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &, Arg)> dg, const Arg &arg) :
             Task(isolate), m_dg(dg)
     {
@@ -210,27 +175,12 @@ public:
         m_dg = dg;
     }
 
-    Arg yield()
-    {
-        Fiber::yield();
-        return m_arg;
-    }
-
-    Fiber::State state() const
-    {
-        return m_fiber->state();
-    }
-
-    void setResult()
-    {
-        setEvent();
-    }
-
 private:
     void run()
     {
         try {
             m_dg(*this, m_arg);
+            setEvent();
         } catch (MdTaskAbortedException &) {
         }
     }
