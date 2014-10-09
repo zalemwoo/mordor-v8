@@ -65,29 +65,6 @@ parser.add_option("--fully-static",
     help="Generate an executable without external dynamic libraries. This "
          "will not work on OSX when using default compilation environment")
 
-parser.add_option("--openssl-no-asm",
-    action="store_true",
-    dest="openssl_no_asm",
-    help="Do not build optimized assembly for OpenSSL")
-
-# deprecated
-parser.add_option('--openssl-includes',
-    action='store',
-    dest='shared_openssl_includes',
-    help=optparse.SUPPRESS_HELP)
-
-# deprecated
-parser.add_option('--openssl-libpath',
-    action='store',
-    dest='shared_openssl_libpath',
-    help=optparse.SUPPRESS_HELP)
-
-# deprecated
-parser.add_option('--openssl-use-sys',
-    action='store_true',
-    dest='shared_openssl',
-    help=optparse.SUPPRESS_HELP)
-
 parser.add_option('--shared-cares',
     action='store_true',
     dest='shared_cares',
@@ -147,26 +124,6 @@ parser.add_option('--shared-libuv-libpath',
     action='store',
     dest='shared_libuv_libpath',
     help='a directory to search for the shared libuv DLL')
-
-parser.add_option('--shared-openssl',
-    action='store_true',
-    dest='shared_openssl',
-    help='link to a shared OpenSSl DLL instead of static linking')
-
-parser.add_option('--shared-openssl-includes',
-    action='store',
-    dest='shared_openssl_includes',
-    help='directory containing OpenSSL header files')
-
-parser.add_option('--shared-openssl-libname',
-    action='store',
-    dest='shared_openssl_libname',
-    help='alternative lib name to link to (default: \'crypto,ssl\')')
-
-parser.add_option('--shared-openssl-libpath',
-    action='store',
-    dest='shared_openssl_libpath',
-    help='a directory to search for the shared OpenSSL DLLs')
 
 parser.add_option('--shared-v8',
     action='store_true',
@@ -296,6 +253,11 @@ parser.add_option('--with-boost-path',
     action='store',
     dest='with_boost_path',
     help='Path to boost')
+
+parser.add_option('--with-openssl-path',
+    action='store',
+    dest='with_openssl_path',
+    help='Path to OpenSSL')
 
 (options, args) = parser.parse_args()
 
@@ -642,10 +604,15 @@ def configure_v8(o):
 
 
 def configure_openssl(o):
-  o['variables']['node_use_openssl'] = b(not options.without_ssl)
-  o['variables']['node_shared_openssl'] = b(options.shared_openssl)
-  o['variables']['openssl_no_asm'] = (
-    1 if options.openssl_no_asm else 0)
+  o['variables']['node_use_openssl'] = 'true'
+  o['variables']['node_shared_openssl'] = 'false'
+  o['variables']['openssl_no_asm'] = 0
+
+  have_openssl_path = bool(options.with_openssl_path)
+  if have_openssl_path:
+    o['variables']['openssl_path'] = options.with_openssl_path
+  else:
+    o['variables']['openssl_path'] = 'third_party/openssl/openssl/include'
 
   if options.without_ssl:
     return
@@ -654,24 +621,6 @@ def configure_openssl(o):
   # macro when we want to _disable_ SSL2.
   if not options.with_sslv2:
     o['defines'] += ['OPENSSL_NO_SSL2=1']
-
-  if options.shared_openssl:
-    (libs, cflags) = pkg_config('openssl') or ('-lssl -lcrypto', '')
-
-    if options.shared_openssl_libpath:
-      o['libraries'] += ['-L%s' % options.shared_openssl_libpath]
-
-    if options.shared_openssl_libname:
-      libnames = options.shared_openssl_libname.split(',')
-      o['libraries'] += ['-l%s' % s for s in libnames]
-    else:
-      o['libraries'] += libs.split()
-
-    if options.shared_openssl_includes:
-      o['include_dirs'] += [options.shared_openssl_includes]
-    else:
-      o['cflags'] += cflags.split()
-
 
 def configure_fullystatic(o):
   if options.fully_static:
@@ -709,7 +658,6 @@ def configure_boost(o):
     o['variables']['boost_path'] = options.with_boost_path
   else:
     o['variables']['boost_path'] = 'third_party'
-
 
 # determine the "flavor" (operating system) we're building for,
 # leveraging gyp's GetFlavor function

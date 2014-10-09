@@ -9,7 +9,7 @@
 #include <memory>
 
 #include "v8/include/v8-platform.h"
-#include "v8/src/base/macros.h"
+#include "mordor/util.h"
 
 namespace Mordor {
 
@@ -17,7 +17,7 @@ class WorkerPool;
 
 namespace Platform {
 
-class DefaultPlatform : public v8::Platform {
+class DefaultPlatform : public v8::Platform, Mordor::noncopyable {
  public:
   DefaultPlatform();
   virtual ~DefaultPlatform();
@@ -30,9 +30,9 @@ class DefaultPlatform : public v8::Platform {
 
   // v8::Platform implementation.
   virtual void CallOnBackgroundThread(
-      v8::Task* task,  v8::Platform::ExpectedRuntime expected_runtime) OVERRIDE;
+      v8::Task* task,  v8::Platform::ExpectedRuntime expected_runtime) override;
   virtual void CallOnForegroundThread(v8::Isolate* isolate,
-          v8::Task* task) OVERRIDE;
+          v8::Task* task) override;
 
  private:
   void runOnBackground(v8::Task *task);
@@ -44,8 +44,6 @@ class DefaultPlatform : public v8::Platform {
   bool initialized_;
   int thread_pool_size_;
   std::unique_ptr<WorkerPool> scheduler_;
-
-  DISALLOW_COPY_AND_ASSIGN(DefaultPlatform);
 };
 
 } }  // namespace Mordor::Platform

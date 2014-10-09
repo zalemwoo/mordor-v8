@@ -5,6 +5,8 @@
       'product_name': 'mordor_shell',
       'type': 'executable',
       'dependencies': [
+        '../third_party/openssl/openssl.gyp:openssl',
+        '../third_party/openssl/openssl.gyp:openssl-cli',
         '../third_party/mordor-base/gyp/mordor.gyp:mordor_base',
         '../third_party/v8/tools/gyp/v8.gyp:v8',
         '../libplatform/libplatform.gyp:mordor_libplatform',
@@ -40,7 +42,17 @@
         'MACOSX_DEPLOYMENT_TARGET': '10.8',        # OS X Deployment Target: 10.8
         'CLANG_CXX_LANGUAGE_STANDARD': 'c++11',
         'CLANG_CXX_LIBRARY': 'libc++', # libc++ requires OS X 10.7 or later
+        'OTHER_LDFLAGS': [
+          '-Wl,-force_load,<(PRODUCT_DIR)/libopenssl.a',
+         ],
       },
+      'conditions': [
+        ['OS in "linux freebsd"', {
+          'ldflags': [
+            '-Wl,--whole-archive <(PRODUCT_DIR)/libopenssl.a -Wl,--no-whole-archive',
+           ],
+        }],
+       ],
     },
   ],
 }

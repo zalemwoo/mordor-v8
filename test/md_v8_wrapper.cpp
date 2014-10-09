@@ -74,6 +74,8 @@ static void ReportException(v8::Isolate* isolate, v8::TryCatch* try_catch)
 namespace Mordor {
 namespace Test {
 
+v8::Persistent<v8::Context> s_context;
+
 // Reads a file into a v8 string.
 v8::Handle<v8::String> ReadFile(v8::Isolate* isolate, const char* name)
 {
@@ -182,7 +184,7 @@ v8::Handle<v8::Context> MD_V8Wrapper::createContext()
     // Create a template for the global object.
     v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New(isolate_);
     // Bind the global 'print' function to the C++ Print callback.
-    global->Set(toV8String("print"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Print));
+    global->Set(toV8String("p"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Print));
     // Bind the global 'read' function to the C++ Read callback.
     global->Set(toV8String("read"), v8::FunctionTemplate::New(isolate_, MD_V8Wrapper::Read));
     // Bind the global 'load' function to the C++ Load callback.
@@ -198,9 +200,47 @@ v8::Handle<v8::Context> MD_V8Wrapper::createContext()
         MORDOR_THROW_EXCEPTION(std::runtime_error("Error creating context"));
     }
 
+    s_context.Reset(isolate_, context_);
+
     return context_;
 }
 
+void co_execString(MD_Task<bool,v8::Handle<v8::String>> &self, v8::Handle<v8::String> source)
+{
+    v8::Isolate* isolate = self.isolate;
+    v8::Isolate::Scope isolate_scope(isolate);
+    v8::HandleScope handle_scope(isolate);
+    v8::Local<v8::Context> context = MD_V8Wrapper::s_curr_->getContext();
+    v8::Context::Scope context_scope(context);
+    v8::TryCatch try_catch;
+    v8::ScriptOrigin origin(MD_V8Wrapper::toV8String(isolate, "md_shell"));
+    v8::Handle<v8::Script> script = v8::Script::Compile(source, &origin);
+    if (script.IsEmpty()) {
+        ::ReportException(isolate, &try_catch);
+        self.setResult(false);
+        return;
+    } else {
+        v8::Handle<v8::Value> result = script->Run();
+        if (result.IsEmpty()) {
+            assert(try_catch.HasCaught());
+            // Print errors that happened during executio
+            ::ReportException(isolate, &try_catch);
+            self.setResult(false);
+            return;
+        } else {
+            assert(!try_catch.HasCaught());
+            if (!result->IsUndefined()) {
+                // If all went well and the result wasn't undefined then print
+                // the returned value.
+                v8::String::Utf8Value str(result);
+                const char* cstr = ::ToCString(str);
+                printf("%s\n", cstr);
+            }
+            self.setResult(true);
+            return;
+        }
+    }
+}
 
 bool MD_V8Wrapper::execString(const std::string& str, bool print_result, bool report_exceptions)
 {
@@ -212,6 +252,11 @@ bool MD_V8Wrapper::execString(
         bool print_result,
         bool report_exceptions)
 {
+#if 0
+    MD_Task<bool,v8::Handle<v8::String>> task(isolate_, &co_execString, source);
+    MD_V8Wrapper::s_worker_->doTask(&task);
+    return task.getResult();
+#else
     v8::HandleScope handle_scope(isolate_);
     v8::TryCatch try_catch;
     v8::ScriptOrigin origin(toV8String(name_));
@@ -241,6 +286,7 @@ bool MD_V8Wrapper::execString(
             return true;
         }
     }
+#endif
 }
 
 // Executes a string within the current v8 context.
@@ -253,14 +299,11 @@ bool MD_V8Wrapper::execString(
     return execString(src, print_result, report_exceptions);
 }
 
-// The callback that is invoked by v8 whenever the JavaScript 'print'
-// function is called.  Prints its arguments on stdout separated by
-// spaces and ending with a newline.
-void MD_V8Wrapper::Print(const v8::FunctionCallbackInfo<v8::Value>& args)
+static void co_print(MD_Task<void, const v8::FunctionCallbackInfo<v8::Value>& > &self, const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     bool first = true;
     for (int i = 0; i < args.Length(); i++) {
-        v8::HandleScope handle_scope(args.GetIsolate());
+        v8::HandleScope handle_scope(self.isolate);
         if (first) {
             first = false;
         } else {
@@ -272,6 +315,16 @@ void MD_V8Wrapper::Print(const v8::FunctionCallbackInfo<v8::Value>& args)
     }
     printf("\n");
     fflush(stdout);
+}
+
+// The callback that is invoked by v8 whenever the JavaScript 'print'
+// function is called.  Prints its arguments on stdout separated by
+// spaces and ending with a newline.
+void MD_V8Wrapper::Print(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+    v8::Isolate* isolate = args.GetIsolate();
+    MD_Task<void, decltype(args)> task(isolate, &co_print, args);
+    MD_V8Wrapper::s_worker_->doTask(&task);
 }
 
 // The callback that is invoked by v8 whenever the JavaScript 'read'
@@ -337,15 +390,6 @@ void MD_V8Wrapper::Quit(const v8::FunctionCallbackInfo<v8::Value>& args)
 static void co_version(MD_Task<const char*> &self)
 {
     const char* ret = v8::V8::GetVersion();
-    v8::Isolate* isolate = self.getIsolate();
-    v8::Isolate::Scope isolate_scope(isolate);
-    v8::HandleScope handle_scope(isolate);
-    v8::Handle<v8::Context> context = MD_V8Wrapper::s_curr_->getContext();
-//    v8::Context::Scope context_scope(context);
-    v8::Handle<v8::String> s = MD_V8Wrapper::toV8String(isolate, "co_version");
-    v8::String::Utf8Value str(s);
-    const char* cstr = ::ToCString(str);
-    printf("%s\n", cstr);
     self.setResult(ret);
 }
 

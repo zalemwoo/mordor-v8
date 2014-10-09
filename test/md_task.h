@@ -5,6 +5,8 @@
 #include "mordor/coroutine.h"
 #include "mordor/fibersynchronization.h"
 
+#include "v8.h"
+
 namespace Mordor
 {
 namespace Test
@@ -20,7 +22,7 @@ class Task
 {
 public:
     Task(v8::Isolate* isolate) :
-            isolate_(isolate)
+            isolate(isolate)
     {
         m_fiber = Fiber::ptr(new Fiber(std::bind(&Task::run, this)));
     }
@@ -47,11 +49,6 @@ public:
         m_fiber->call();
     }
 
-    v8::Isolate* getIsolate()
-    {
-        return isolate_;
-    }
-
     Fiber::State state() const
     {
         return m_fiber->state();
@@ -59,8 +56,12 @@ public:
 
     void waitEvent()
     {
+        v8::Unlocker unlocker(isolate);
         event_.wait();
     }
+
+public:
+    v8::Isolate* isolate;
 
 protected:
     virtual void run() = 0;
@@ -72,7 +73,6 @@ protected:
 
 protected:
     Fiber::ptr m_fiber;
-    v8::Isolate* isolate_;
     Mordor::FiberEvent event_ { false };
 };
 
@@ -80,17 +80,10 @@ template<class Result, class Arg = DummyVoid>
 class MD_Task: public Task, Mordor::noncopyable
 {
 public:
-    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &, Arg)> dg, const Arg &arg) :
-            Task(isolate), m_dg(dg)
+    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &, const Arg&)> dg, const Arg& arg) :
+            Task(isolate), m_dg(dg), m_arg(arg)
     {
         m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
-        m_arg = arg;
-    }
-
-    void reset(std::function<void(MD_Task &, Arg)> dg)
-    {
-        reset();
-        m_dg = dg;
     }
 
     void setResult(const Result &result)
@@ -107,15 +100,15 @@ private:
     {
         try {
             m_dg(*this, m_arg);
-            setEvent();
         } catch (MdTaskAbortedException &) {
         }
+        setEvent();
     }
 
 private:
-    std::function<void(MD_Task &, Arg)> m_dg;
+    std::function<void(MD_Task &, const Arg&)> m_dg;
     Result m_result;
-    Arg m_arg;
+    const Arg& m_arg;
 };
 
 template<class Result>
@@ -126,12 +119,6 @@ public:
             Task(isolate), m_dg(dg)
     {
         m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
-    }
-
-    void reset(std::function<void(MD_Task &)> dg)
-    {
-        reset();
-        m_dg = dg;
     }
 
     void setResult(const Result &result)
@@ -148,9 +135,9 @@ private:
     {
         try {
             m_dg(*this);
-            setEvent();
         } catch (MdTaskAbortedException &) {
         }
+        setEvent();
     }
 
 private:
@@ -162,17 +149,10 @@ template<class Arg>
 class MD_Task<void, Arg> : public Task, Mordor::noncopyable
 {
 public:
-    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &, Arg)> dg, const Arg &arg) :
-            Task(isolate), m_dg(dg)
+    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &, const Arg&)> dg, const Arg& arg) :
+            Task(isolate), m_dg(dg), m_arg(arg)
     {
         m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
-        m_arg = arg;
-    }
-
-    void reset(std::function<void(MD_Task &, Arg)> dg)
-    {
-        reset();
-        m_dg = dg;
     }
 
 private:
@@ -180,14 +160,83 @@ private:
     {
         try {
             m_dg(*this, m_arg);
-            setEvent();
         } catch (MdTaskAbortedException &) {
         }
+        setEvent();
     }
 
 private:
-    std::function<void(MD_Task &, Arg)> m_dg;
-    Arg m_arg;
+    std::function<void(MD_Task &, const Arg&)> m_dg;
+    const Arg& m_arg;
+};
+
+
+template<class Result>
+class MD_Task<Result, const v8::FunctionCallbackInfo<v8::Value> &>: public Task, Mordor::noncopyable
+{
+public:
+    typedef const v8::FunctionCallbackInfo<v8::Value>& arg_type;
+    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &, arg_type)> dg, arg_type arg) :
+            Task(isolate), m_dg(dg), m_arg(arg)
+    {
+        m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
+    }
+
+    void setResult(const Result &result)
+    {
+        m_result = result;
+    }
+
+    const Result& getResult()
+    {
+        return m_result;
+    }
+private:
+    void run()
+    {
+        try {
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            m_dg(*this, m_arg);
+        } catch (MdTaskAbortedException &) {
+        }
+        setEvent();
+    }
+
+private:
+    std::function<void(MD_Task &, arg_type)> m_dg;
+    Result m_result;
+    arg_type m_arg;
+};
+
+
+template<>
+class MD_Task<void, const v8::FunctionCallbackInfo<v8::Value> &> : public Task, Mordor::noncopyable
+{
+public:
+    typedef const v8::FunctionCallbackInfo<v8::Value>& arg_type;
+
+    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &, arg_type)> dg, arg_type arg) :
+            Task(isolate), m_dg(dg), m_arg(arg)
+    {
+        m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
+    }
+
+private:
+    void run()
+    {
+        try {
+            v8::Locker locker(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            m_dg(*this, m_arg);
+        } catch (MdTaskAbortedException &) {
+        }
+        setEvent();
+    }
+
+private:
+    std::function<void(MD_Task &, arg_type)> m_dg;
+    arg_type m_arg;
 };
 
 }

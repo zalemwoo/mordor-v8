@@ -9,7 +9,6 @@
 #include <memory>
 
 #include "v8.h"
-#include "v8/src/base/macros.h"
 
 #include "md_task.h"
 
@@ -19,14 +18,14 @@ class IOManager;
 
 namespace Test {
 
-class MD_Worker {
+class MD_Worker : Mordor::noncopyable{
  public:
   MD_Worker();
   virtual ~MD_Worker();
 
-  void SetThreadPoolSize(int thread_pool_size);
+  void setThreadPoolSize(int thread_pool_size);
 
-  void EnsureInitialized();
+  void ensureInitialized();
 
   void doTask(Task* task);
 
@@ -40,8 +39,6 @@ class MD_Worker {
   bool initialized_;
   int thread_pool_size_;
   std::unique_ptr<IOManager> scheduler_;
-
-  DISALLOW_COPY_AND_ASSIGN(MD_Worker);
 };
 
 MD_Worker* CreateWorker(int thread_pool_size = 0);
