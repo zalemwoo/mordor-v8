@@ -12,6 +12,7 @@
 #include "v8/src/libplatform/worker-thread.h"
 
 #include "mordor/workerpool.h"
+#include "mordor/timer.h"
 
 namespace Mordor
 {
@@ -78,6 +79,11 @@ bool DefaultPlatform::PumpMessageLoop(v8::Isolate* isolate)
 //    task->Run();
 //    delete task;
     return true;
+}
+
+double DefaultPlatform::MonotonicallyIncreasingTime()
+{
+    return Mordor::TimerManager::now();
 }
 
 void DefaultPlatform::CallOnBackgroundThread(v8::Task *task, v8::Platform::ExpectedRuntime expected_runtime)

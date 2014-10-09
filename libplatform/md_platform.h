@@ -33,6 +33,7 @@ class DefaultPlatform : public v8::Platform, Mordor::noncopyable {
       v8::Task* task,  v8::Platform::ExpectedRuntime expected_runtime) override;
   virtual void CallOnForegroundThread(v8::Isolate* isolate,
           v8::Task* task) override;
+  virtual double MonotonicallyIncreasingTime() override;
 
  private:
   void runOnBackground(v8::Task *task);
