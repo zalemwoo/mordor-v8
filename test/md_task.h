@@ -54,9 +54,8 @@ public:
         return m_fiber->state();
     }
 
-    void waitEvent()
+    virtual void waitEvent()
     {
-        v8::Unlocker unlocker(isolate);
         event_.wait();
     }
 
@@ -182,6 +181,12 @@ public:
         m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
     }
 
+    virtual void waitEvent() override
+    {
+        v8::Unlocker unlocker(isolate);
+        event_.wait();
+    }
+
     void setResult(const Result &result)
     {
         m_result = result;
@@ -220,6 +225,12 @@ public:
             Task(isolate), m_dg(dg), m_arg(arg)
     {
         m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
+    }
+
+    virtual void waitEvent() override
+    {
+        v8::Unlocker unlocker(isolate);
+        event_.wait();
     }
 
 private:
