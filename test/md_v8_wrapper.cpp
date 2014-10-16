@@ -16,8 +16,8 @@
 #include "md_v8_wrapper.h"
 #include "md_worker.h"
 #include "md_task.h"
-#include "libplatform/libplatform.h"
-#include "libplatform/md_platform.h"
+#include "v8/include/libplatform/libplatform.h"
+// #include "libplatform/libplatform.h"
 
 /*
 static const char* g_harmony_opts = " --harmony --harmony_scoping --harmony_modules"
@@ -95,8 +95,8 @@ v8::Handle<v8::String> ReadFile(v8::Isolate* isolate, const char* name)
         inStream->close();
         v8::Handle<v8::String> result = v8::String::NewFromUtf8(isolate, buf.toString().c_str(), v8::String::kNormalString, size);
         return result;
-    } catch (...) {
-        std::cerr << boost::current_exception_diagnostic_information() << std::endl;
+    } catch (const std::exception& ex) {
+        std::cerr << ex.what() << std::endl << std::flush;
         return v8::String::Empty(isolate);
     }
 }
@@ -160,7 +160,7 @@ void MD_V8Wrapper::init(int argc, char** argv)
     MD_V8Wrapper::s_argv_ = argv;
 
     v8::V8::InitializeICU();
-    MD_V8Wrapper::s_platform_.reset(Mordor::Platform::CreatePlatform(1));
+    MD_V8Wrapper::s_platform_.reset(v8::platform::CreateDefaultPlatform(1));
     MD_V8Wrapper::s_worker_.reset(CreateWorker(4));
 
     v8::V8::InitializePlatform(MD_V8Wrapper::s_platform_.get());
@@ -172,11 +172,11 @@ void MD_V8Wrapper::init(int argc, char** argv)
 
 void MD_V8Wrapper::shutdown()
 {
+    MD_V8Wrapper::s_worker_.reset();
     MD_V8Wrapper::s_curr_.reset();
     v8::V8::Dispose();
     v8::V8::ShutdownPlatform();
     MD_V8Wrapper::s_platform_.reset();
-    MD_V8Wrapper::s_worker_.reset();
 }
 
 v8::Handle<v8::Context> MD_V8Wrapper::createContext()
@@ -208,6 +208,7 @@ v8::Handle<v8::Context> MD_V8Wrapper::createContext()
 void co_execString(MD_Task<bool,v8::Handle<v8::String>> &self, v8::Handle<v8::String> source)
 {
     v8::Isolate* isolate = self.isolate;
+    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handle_scope(isolate);
     v8::Local<v8::Context> context = MD_V8Wrapper::s_curr_->getContext();
@@ -254,6 +255,7 @@ bool MD_V8Wrapper::execString(
 {
 #if 0
     MD_Task<bool,v8::Handle<v8::String>> task(isolate_, &co_execString, source);
+    v8::Unlocker unlocker(isolate_);
     MD_V8Wrapper::s_worker_->doTask(&task);
     return task.getResult();
 #else

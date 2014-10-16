@@ -29,16 +29,16 @@ public:
 
     virtual ~Task()
     {
-        reset();
+        // reset();
     }
 
     void reset()
     {
         if (m_fiber->state() == Fiber::HOLD) {
             try {
-                throw boost::enable_current_exception(MdTaskAbortedException());
+                throw MdTaskAbortedException();
             } catch (...) {
-                m_fiber->inject(boost::current_exception());
+                m_fiber->inject(std::current_exception());
             }
         }
         m_fiber->reset(std::bind(&Task::run, this));

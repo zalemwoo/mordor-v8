@@ -54,6 +54,7 @@ MD_Runner::MD_Runner(Scheduler& sched) :
         sched_(sched)
 {
     sched_.schedule(std::bind(&MD_Runner::run, this));
+    this->wait();
 }
 
 MD_Runner::~MD_Runner()
@@ -92,8 +93,7 @@ void MD_Runner::run()
 
     fputs("bye.\n", stderr);
     runtime.reset();
-
-    sched_.stop();
+    sem_.notify();
 }
 
 } }  // namespace Mordor::Test

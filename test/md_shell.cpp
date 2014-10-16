@@ -84,7 +84,6 @@ MORDOR_MAIN(int argc, char* argv[])
 
     WorkerPool pool;
     Mordor::Test::MD_Runner runner(pool);
-    pool.yieldTo();
 
     return result;
 }

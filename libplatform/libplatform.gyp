@@ -6,7 +6,7 @@
       'type': 'static_library',
       'dependencies': [
         '../third_party/mordor-base/gyp/mordor.gyp:mordor_base',
-        '../third_party/v8/tools/gyp/v8.gyp:v8',
+        '../third_party/v8/mordor_v8_patch/gen/v8.gyp:v8',
       ],
       'include_dirs': [
         '.',

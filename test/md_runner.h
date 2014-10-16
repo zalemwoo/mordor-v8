@@ -2,6 +2,7 @@
 #define MD_RUNNER_H_
 
 #include "mordor/iomanager.h"
+#include "mordor/fibersynchronization.h"
 
 namespace Mordor {
 
@@ -17,8 +18,14 @@ public:
     ~MD_Runner();
 
     void run();
+
+    void wait(){
+        sem_.wait();
+    }
+
 private:
     Scheduler& sched_;
+    FiberSemaphore sem_;
 };
 
 } } // namespace Mordor::Test
