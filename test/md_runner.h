@@ -1,6 +1,8 @@
 #ifndef MD_RUNNER_H_
 #define MD_RUNNER_H_
 
+#include "mordor/version.h"
+
 #include "mordor/iomanager.h"
 #include "mordor/fibersynchronization.h"
 

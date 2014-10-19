@@ -249,11 +249,6 @@ parser.add_option('--xcode',
     dest='use_xcode',
     help='generate build files for use with xcode')
 
-parser.add_option('--with-boost-path',
-    action='store',
-    dest='with_boost_path',
-    help='Path to boost')
-
 parser.add_option('--with-openssl-path',
     action='store',
     dest='with_openssl_path',
@@ -652,13 +647,6 @@ def configure_icu(o):
   if have_icu_path:
     o['variables']['icu_gyp_path'] = options.with_icu_path
 
-def configure_boost(o):
-  have_boost_path = bool(options.with_boost_path)
-  if have_boost_path:
-    o['variables']['boost_path'] = options.with_boost_path
-  else:
-    o['variables']['boost_path'] = 'third_party'
-
 # determine the "flavor" (operating system) we're building for,
 # leveraging gyp's GetFlavor function
 flavor_params = {}
@@ -684,7 +672,6 @@ configure_openssl(output)
 configure_winsdk(output)
 configure_icu(output)
 configure_fullystatic(output)
-configure_boost(output)
 
 # variables should be a root level element,
 # move everything else to target_defaults

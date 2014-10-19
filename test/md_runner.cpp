@@ -9,7 +9,6 @@
 
 #include "md_runner.h"
 
-#include "mordor/version.h"
 #include "mordor/type_name.h"
 #include "mordor/thread.h"
 #include "mordor/fiber.h"
