@@ -25,6 +25,7 @@
         './md_runner.cpp',
         './md_shell.cpp',
         './md_v8_wrapper.cpp',
+        './md_task_queue.cpp',
         './md_worker.cpp',
       ],
       'cflags': [ '-std=c++11' ],

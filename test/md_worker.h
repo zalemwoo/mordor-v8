@@ -9,8 +9,9 @@
 #include <memory>
 
 #include "v8.h"
+#include "mordor/fiber.h"
 
-#include "md_task.h"
+#include "md_task_queue.h"
 
 namespace Mordor {
 
@@ -23,7 +24,7 @@ class MD_Worker : Mordor::noncopyable{
   MD_Worker();
   virtual ~MD_Worker();
 
-  void setThreadPoolSize(int thread_pool_size);
+  void setWorkerPoolSize(int worker_pool_size);
 
   void ensureInitialized();
 
@@ -31,17 +32,26 @@ class MD_Worker : Mordor::noncopyable{
 
  private:
   void run(Task *task);
+  void idle();
 
  private:
-  static const int kMaxThreadPoolSize;
+  static const int kMaxWorkerPoolSize;
 
   std::mutex lock_;
   bool initialized_;
-  int thread_pool_size_;
-  std::unique_ptr<IOManager> scheduler_;
+  int worker_pool_size_;
+  std::vector<std::shared_ptr<Fiber>> workers_;
+  Fiber* curr_fiber_{nullptr};
+
+  std::shared_ptr<IOManager> sched_;
+
+  FiberMutex worker_mutex_;
+  FiberCondition worker_cond_;
+
+  MD_TaskQueue task_queue_;
 };
 
-MD_Worker* CreateWorker(int thread_pool_size = 0);
+MD_Worker* CreateWorker(int worker_pool_size = 0);
 
 } }  // namespace Mordor::Test
 

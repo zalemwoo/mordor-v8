@@ -401,6 +401,7 @@ void MD_V8Wrapper::Version(const v8::FunctionCallbackInfo<v8::Value>& args)
     MD_Task<const char*> task(isolate, &co_version);
     MD_V8Wrapper::s_worker_->doTask(&task);
     const char* result = task.getResult();
+
     v8::Handle<v8::Value> ret = MD_V8Wrapper::toV8String(isolate, result);
     args.GetReturnValue().Set(ret);
 }

@@ -82,7 +82,7 @@ MORDOR_MAIN(int argc, char* argv[])
 
     int result = 0;
 
-    WorkerPool pool;
+    IOManager pool(3);
     Mordor::Test::MD_Runner runner(pool);
 
     return result;

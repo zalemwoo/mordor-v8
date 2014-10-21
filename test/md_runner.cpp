@@ -52,7 +52,7 @@ static void readScript(Coroutine<const char*>& self)
 MD_Runner::MD_Runner(Scheduler& sched) :
         sched_(sched)
 {
-    sched_.schedule(std::bind(&MD_Runner::run, this));
+    sched_.schedule(std::bind(&MD_Runner::run, this), gettid());
     this->wait();
 }
 

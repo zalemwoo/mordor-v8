@@ -72,6 +72,8 @@ protected:
         return s_curr_->shared_from_this();
     }
 
+    static std::shared_ptr<Scheduler> sched_;
+
 public:
     class Scope{
     public:
