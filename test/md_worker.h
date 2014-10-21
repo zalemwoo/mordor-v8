@@ -28,7 +28,31 @@ class MD_Worker : Mordor::noncopyable{
 
   void ensureInitialized();
 
-  void doTask(Task* task);
+  template <typename Result, typename ARGS>
+  void doTask(const std::function<void(MD_Task<Result,ARGS>&)>& func, v8::Isolate* isolate, Result& ret)
+  {
+      MD_Task<Result, ARGS> task(isolate, func);
+      task_queue_.append(&task);
+      task->waitEvent();
+      ret = task->getResult();
+  }
+
+  template <typename Result, typename ARGS>
+  void doTask(const std::function<void(MD_Task<void, ARGS>&)>& func, v8::Isolate* isolate)
+  {
+      MD_Task<void, ARGS> task(isolate, func);
+      task_queue_.append(&task);
+      task.waitEvent();
+  }
+
+  template <typename Result>
+  void doTask(const std::function<void(MD_Task<Result>&)>& func, v8::Isolate* isolate, Result& ret)
+  {
+      MD_Task<Result> task(isolate, func);
+      task_queue_.append(&task);
+      task.waitEvent();
+      ret = task.getResult();
+  }
 
  private:
   void run(Task *task);

@@ -174,9 +174,8 @@ template<class Result>
 class MD_Task<Result, const v8::FunctionCallbackInfo<v8::Value> &>: public Task, Mordor::noncopyable
 {
 public:
-    typedef const v8::FunctionCallbackInfo<v8::Value>& arg_type;
-    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &, arg_type)> dg, arg_type arg) :
-            Task(isolate), m_dg(dg), m_arg(arg)
+    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &)> dg) :
+            Task(isolate), m_dg(dg)
     {
         m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
     }
@@ -202,27 +201,24 @@ private:
         try {
             v8::Locker locker(isolate);
             v8::Isolate::Scope isolate_scope(isolate);
-            m_dg(*this, m_arg);
+            m_dg(*this);
         } catch (MdTaskAbortedException &) {
         }
         setEvent();
     }
 
 private:
-    std::function<void(MD_Task &, arg_type)> m_dg;
+    std::function<void(MD_Task &)> m_dg;
     Result m_result;
-    arg_type m_arg;
 };
-
 
 template<>
 class MD_Task<void, const v8::FunctionCallbackInfo<v8::Value> &> : public Task, Mordor::noncopyable
 {
 public:
-    typedef const v8::FunctionCallbackInfo<v8::Value>& arg_type;
 
-    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &, arg_type)> dg, arg_type arg) :
-            Task(isolate), m_dg(dg), m_arg(arg)
+    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &)> dg) :
+            Task(isolate), m_dg(dg)
     {
         m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
     }
@@ -239,15 +235,14 @@ private:
         try {
             v8::Locker locker(isolate);
             v8::Isolate::Scope isolate_scope(isolate);
-            m_dg(*this, m_arg);
+            m_dg(*this);
         } catch (MdTaskAbortedException &) {
         }
         setEvent();
     }
 
 private:
-    std::function<void(MD_Task &, arg_type)> m_dg;
-    arg_type m_arg;
+    std::function<void(MD_Task &)> m_dg;
 };
 
 }

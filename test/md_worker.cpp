@@ -12,7 +12,6 @@
 #include "mordor/iomanager.h"
 #include "mordor/fibersynchronization.h"
 #include "mordor/sleep.h"
-#include "md_task.h"
 
 namespace Mordor
 {
@@ -37,6 +36,7 @@ MD_Worker::MD_Worker() :
 MD_Worker::~MD_Worker()
 {
     std::lock_guard<std::mutex> scopeLock(lock_);
+    task_queue_.terminate();
 }
 
 void MD_Worker::setWorkerPoolSize(int worker_pool_size)
@@ -70,26 +70,13 @@ void MD_Worker::ensureInitialized()
 
 void MD_Worker::idle()
 {
-    while(true){
+    while (true) {
         Task* task = NULL;
-        {
-            FiberMutex::ScopedLock lock(worker_mutex_);
-            worker_cond_.wait();
-            std::cout << "*** run on: " << Fiber::getThis() << std::endl;
-            task = task_queue_.getNext();
-        }
-        if(task){
-            task->Call();
-        }
+        task = task_queue_.getNext();
+        if (!task) return;
+        std::cout << "*** run on: " << Fiber::getThis() << std::endl;
+        task->Call();
     }
 }
 
-void MD_Worker::doTask(Task* task)
-{
-    task_queue_.append(task);
-    worker_cond_.signal();
-    task->waitEvent();
-}
-
-}
-}  // namespace Mordor::Test
+} }  // namespace Mordor::Test

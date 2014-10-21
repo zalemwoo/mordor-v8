@@ -325,8 +325,7 @@ static void co_print(MD_Task<void, const v8::FunctionCallbackInfo<v8::Value>& > 
 void MD_V8Wrapper::Print(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     v8::Isolate* isolate = args.GetIsolate();
-    MD_Task<void, decltype(args)> task(isolate, &co_print, args);
-    MD_V8Wrapper::s_worker_->doTask(&task);
+    MD_V8Wrapper::s_worker_->doTask<void, decltype(args)>(std::bind(&co_print, std::placeholders::_1, args),isolate);
 }
 
 // The callback that is invoked by v8 whenever the JavaScript 'read'
@@ -398,10 +397,8 @@ static void co_version(MD_Task<const char*> &self)
 void MD_V8Wrapper::Version(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     v8::Isolate* isolate = args.GetIsolate();
-    MD_Task<const char*> task(isolate, &co_version);
-    MD_V8Wrapper::s_worker_->doTask(&task);
-    const char* result = task.getResult();
-
+    const char* result;
+    MD_V8Wrapper::s_worker_->doTask<const char*>(&co_version,isolate, result);
     v8::Handle<v8::Value> ret = MD_V8Wrapper::toV8String(isolate, result);
     args.GetReturnValue().Set(ret);
 }
