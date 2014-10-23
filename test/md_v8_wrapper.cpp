@@ -77,7 +77,7 @@ namespace Test {
 v8::Persistent<v8::Context> s_context;
 
 // Reads a file into a v8 string.
-v8::Handle<v8::String> ReadFile(v8::Isolate* isolate, const char* name)
+v8::Local<v8::String> ReadFile(v8::Isolate* isolate, const char* name)
 {
     try {
         Stream::ptr inStream(new FileStream(name, FileStream::READ));
@@ -93,7 +93,7 @@ v8::Handle<v8::String> ReadFile(v8::Isolate* isolate, const char* name)
         }while(readed);
 
         inStream->close();
-        v8::Handle<v8::String> result = v8::String::NewFromUtf8(isolate, buf.toString().c_str(), v8::String::kNormalString, size);
+        v8::Local<v8::String> result = v8::String::NewFromUtf8(isolate, buf.toString().c_str(), v8::String::kNormalString, size);
         return result;
     } catch (const std::exception& ex) {
         std::cerr << ex.what() << std::endl << std::flush;
@@ -146,9 +146,9 @@ void ArrayBufferAllocator::Free(void* data, size_t length) {
 bool MD_V8Wrapper::s_inited_ = false;
 int MD_V8Wrapper::s_argc_ = 0;
 char** MD_V8Wrapper::s_argv_ = NULL;
-std::shared_ptr<MD_V8Wrapper> MD_V8Wrapper::s_curr_;
-std::unique_ptr<v8::Platform> MD_V8Wrapper::s_platform_;
 std::unique_ptr<MD_Worker> MD_V8Wrapper::s_worker_;
+MD_V8Wrapper* MD_V8Wrapper::s_curr_;
+v8::Platform* MD_V8Wrapper::s_platform_;
 
 void MD_V8Wrapper::init(int argc, char** argv)
 {
@@ -160,10 +160,10 @@ void MD_V8Wrapper::init(int argc, char** argv)
     MD_V8Wrapper::s_argv_ = argv;
 
     v8::V8::InitializeICU();
-    MD_V8Wrapper::s_platform_.reset(v8::platform::CreateDefaultPlatform(1));
+    MD_V8Wrapper::s_platform_ = v8::platform::CreateDefaultPlatform(1);
     MD_V8Wrapper::s_worker_.reset(CreateWorker(4));
 
-    v8::V8::InitializePlatform(MD_V8Wrapper::s_platform_.get());
+    v8::V8::InitializePlatform(MD_V8Wrapper::s_platform_);
     v8::V8::Initialize();
     v8::V8::SetFlagsFromCommandLine(&MD_V8Wrapper::s_argc_, MD_V8Wrapper::s_argv_, true);
 //    v8::V8::SetFlagsFromString(g_harmony_opts, sizeof(g_harmony_opts) - 1);
@@ -172,11 +172,10 @@ void MD_V8Wrapper::init(int argc, char** argv)
 
 void MD_V8Wrapper::shutdown()
 {
-    MD_V8Wrapper::s_worker_.reset();
-    MD_V8Wrapper::s_curr_.reset();
+    MD_V8Wrapper::s_worker_.reset(nullptr);
     v8::V8::Dispose();
     v8::V8::ShutdownPlatform();
-    MD_V8Wrapper::s_platform_.reset();
+    delete MD_V8Wrapper::s_platform_;
 }
 
 v8::Handle<v8::Context> MD_V8Wrapper::createContext()
@@ -205,9 +204,10 @@ v8::Handle<v8::Context> MD_V8Wrapper::createContext()
     return context_;
 }
 
+#if 0
 void co_execString(MD_Task<bool,v8::Handle<v8::String>> &self, v8::Handle<v8::String> source)
 {
-    v8::Isolate* isolate = self.isolate;
+    v8::Isolate* isolate = self.getIsolate();
     v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handle_scope(isolate);
@@ -242,6 +242,7 @@ void co_execString(MD_Task<bool,v8::Handle<v8::String>> &self, v8::Handle<v8::St
         }
     }
 }
+#endif
 
 bool MD_V8Wrapper::execString(const std::string& str, bool print_result, bool report_exceptions)
 {
@@ -305,7 +306,7 @@ static void co_print(MD_Task<void, const v8::FunctionCallbackInfo<v8::Value>& > 
 {
     bool first = true;
     for (int i = 0; i < args.Length(); i++) {
-        v8::HandleScope handle_scope(self.isolate);
+        v8::HandleScope handle_scope(self.getIsolate());
         if (first) {
             first = false;
         } else {
@@ -325,7 +326,48 @@ static void co_print(MD_Task<void, const v8::FunctionCallbackInfo<v8::Value>& > 
 void MD_V8Wrapper::Print(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     v8::Isolate* isolate = args.GetIsolate();
-    MD_V8Wrapper::s_worker_->doTask<void, decltype(args)>(std::bind(&co_print, std::placeholders::_1, args),isolate);
+#if 1
+    MD_V8Wrapper::s_worker_->doTask<void, decltype(args)>(isolate, std::bind(&co_print, std::placeholders::_1, args));
+#else
+    bool first = true;
+    for (int i = 0; i < args.Length(); i++) {
+        v8::HandleScope handle_scope(isolate);
+        if (first) {
+            first = false;
+        } else {
+            printf(" ");
+        }
+        v8::String::Utf8Value str(args[i]);
+        const char* cstr = ::ToCString(str);
+        printf("%s", cstr);
+    }
+    printf("\n");
+    fflush(stdout);
+#endif
+}
+
+static void co_read(MD_Task<v8::Local<v8::String>, const v8::FunctionCallbackInfo<v8::Value>& > &self, const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+    v8::Isolate* isolate = self.getIsolate();
+    if (args.Length() != 1) {
+        isolate->ThrowException(MD_V8Wrapper::toV8String(isolate, "Bad parameters"));
+        self.setResult(v8::String::Empty(isolate));
+        return;
+    }
+    v8::String::Utf8Value file(args[0]);
+    if (*file == NULL) {
+        isolate->ThrowException(MD_V8Wrapper::toV8String(isolate, "Error loading file"));
+        self.setResult(v8::String::Empty(isolate));
+        return;
+    }
+    v8::Local<v8::String> source = ReadFile(isolate, *file);
+    if (source.IsEmpty()) {
+        isolate->ThrowException(MD_V8Wrapper::toV8String(isolate, "Error loading file"));
+        self.setResult(v8::String::Empty(isolate));
+        return;
+    }
+
+    self.setResult(source);
 }
 
 // The callback that is invoked by v8 whenever the JavaScript 'read'
@@ -334,20 +376,8 @@ void MD_V8Wrapper::Print(const v8::FunctionCallbackInfo<v8::Value>& args)
 void MD_V8Wrapper::Read(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     v8::Isolate* isolate = args.GetIsolate();
-    if (args.Length() != 1) {
-        isolate->ThrowException(MD_V8Wrapper::toV8String(isolate, "Bad parameters"));
-        return;
-    }
-    v8::String::Utf8Value file(args[0]);
-    if (*file == NULL) {
-        isolate->ThrowException(MD_V8Wrapper::toV8String(isolate, "Error loading file"));
-        return;
-    }
-    v8::Handle<v8::String> source = ReadFile(isolate, *file);
-    if (source.IsEmpty()) {
-        isolate->ThrowException(MD_V8Wrapper::toV8String(isolate, "Error loading file"));
-        return;
-    }
+    v8::Local<v8::String> source;
+    MD_V8Wrapper::s_worker_->doTask<v8::Local<v8::String>, decltype(args)>(isolate, std::bind(&co_read, std::placeholders::_1, args), source);
     args.GetReturnValue().Set(source);
 }
 
@@ -388,7 +418,7 @@ void MD_V8Wrapper::Quit(const v8::FunctionCallbackInfo<v8::Value>& args)
     MD_V8Wrapper::s_curr_->running_ = false;
 }
 
-static void co_version(MD_Task<const char*> &self)
+static void co_version(MD_Task<const char*, const v8::FunctionCallbackInfo<v8::Value>&> &self)
 {
     const char* ret = v8::V8::GetVersion();
     self.setResult(ret);
@@ -398,7 +428,7 @@ void MD_V8Wrapper::Version(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     v8::Isolate* isolate = args.GetIsolate();
     const char* result;
-    MD_V8Wrapper::s_worker_->doTask<const char*>(&co_version,isolate, result);
+    MD_V8Wrapper::s_worker_->doTask<const char*, decltype(args)>(isolate, &co_version, result);
     v8::Handle<v8::Value> ret = MD_V8Wrapper::toV8String(isolate, result);
     args.GetReturnValue().Set(ret);
 }

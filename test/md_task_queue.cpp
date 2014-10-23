@@ -8,7 +8,7 @@ namespace Test
 {
 
 MD_TaskQueue::MD_TaskQueue() :
-        process_queue_semaphore_(0), terminated_(false)
+        lock_(), condition_(lock_), terminated_(false)
 {
 }
 
@@ -24,25 +24,23 @@ void MD_TaskQueue::append(Task* task)
     FiberMutex::ScopedLock lock(lock_);
     MORDOR_ASSERT(!terminated_);
     task_queue_.push(task);
-    process_queue_semaphore_.notify();
+    condition_.signal();
 }
 
 Task* MD_TaskQueue::getNext()
 {
-    for (;;) {
-        {
-            FiberMutex::ScopedLock lock(lock_);
-            if (!task_queue_.empty()) {
-                Task* result = task_queue_.front();
-                task_queue_.pop();
-                return result;
-            }
-            if (terminated_) {
-                process_queue_semaphore_.notify();
-                return NULL;
-            }
+    while(true){
+        FiberMutex::ScopedLock lock(lock_);
+        if (terminated_) {
+            condition_.broadcast();
+            return NULL;
         }
-        process_queue_semaphore_.wait();
+        if (!task_queue_.empty()) {
+            Task* result = task_queue_.front();
+            task_queue_.pop();
+            return result;
+        }
+        condition_.wait();
     }
 }
 
@@ -51,7 +49,7 @@ void MD_TaskQueue::terminate()
     FiberMutex::ScopedLock lock(lock_);
     MORDOR_ASSERT(!terminated_);
     terminated_ = true;
-    process_queue_semaphore_.notify();
+    condition_.broadcast();
 }
 
 }

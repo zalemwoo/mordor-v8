@@ -35,6 +35,7 @@
 
 #include <v8.h>
 
+#include "mordor/assert.h"
 #include "mordor/config.h"
 #include "mordor/main.h"
 #include "mordor/type_name.h"
@@ -66,6 +67,8 @@ char** g_argv = NULL;
 
 MORDOR_MAIN(int argc, char* argv[])
 {
+    Assertion::throwOnAssertion = true;
+
     g_argc = argc;
     g_argv = argv;
 
@@ -82,7 +85,7 @@ MORDOR_MAIN(int argc, char* argv[])
 
     int result = 0;
 
-    IOManager pool(3);
+    IOManager pool(1);
     Mordor::Test::MD_Runner runner(pool);
 
     return result;

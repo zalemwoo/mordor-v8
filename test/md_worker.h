@@ -25,28 +25,29 @@ class MD_Worker : Mordor::noncopyable{
   virtual ~MD_Worker();
 
   void setWorkerPoolSize(int worker_pool_size);
-
   void ensureInitialized();
 
-  template <typename Result, typename ARGS>
-  void doTask(const std::function<void(MD_Task<Result,ARGS>&)>& func, v8::Isolate* isolate, Result& ret)
+  void stop();
+
+  template <typename Result, typename... ARGS>
+  void doTask(v8::Isolate* isolate, const typename MD_Task<Result, ARGS...>::CallbackType& func, Result& ret)
   {
-      MD_Task<Result, ARGS> task(isolate, func);
+      MD_Task<Result, ARGS...> task(isolate, func);
       task_queue_.append(&task);
-      task->waitEvent();
-      ret = task->getResult();
+      task.waitEvent();
+      ret = task.getResult();
   }
 
-  template <typename Result, typename ARGS>
-  void doTask(const std::function<void(MD_Task<void, ARGS>&)>& func, v8::Isolate* isolate)
+  template <typename Result, typename... ARGS>
+  void doTask(v8::Isolate* isolate, const typename MD_Task<void, ARGS...>::CallbackType& func)
   {
-      MD_Task<void, ARGS> task(isolate, func);
+      MD_Task<void, ARGS...> task(isolate, func);
       task_queue_.append(&task);
       task.waitEvent();
   }
 
   template <typename Result>
-  void doTask(const std::function<void(MD_Task<Result>&)>& func, v8::Isolate* isolate, Result& ret)
+  void doTask(v8::Isolate* isolate, const typename MD_Task<Result>::CallbackType& func, Result& ret)
   {
       MD_Task<Result> task(isolate, func);
       task_queue_.append(&task);
@@ -55,17 +56,15 @@ class MD_Worker : Mordor::noncopyable{
   }
 
  private:
-  void run(Task *task);
-  void idle();
+  void run();
 
  private:
-  static const int kMaxWorkerPoolSize;
+  static const int kMaxWorkerThreadSize;
 
   std::mutex lock_;
   bool initialized_;
   int worker_pool_size_;
   std::vector<std::shared_ptr<Fiber>> workers_;
-  Fiber* curr_fiber_{nullptr};
 
   std::shared_ptr<IOManager> sched_;
 

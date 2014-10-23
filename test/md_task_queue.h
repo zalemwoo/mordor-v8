@@ -31,7 +31,7 @@ class MD_TaskQueue : Mordor::noncopyable{
 
  private:
   FiberMutex lock_;
-  FiberSemaphore process_queue_semaphore_;
+  FiberCondition condition_;
   std::queue<Task*> task_queue_;
   bool terminated_;
 

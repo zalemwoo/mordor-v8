@@ -65,8 +65,8 @@ void MD_Runner::run()
     MD_V8Wrapper::Scope warpper_scope(g_argc, g_argv);
     fprintf(stderr, "V8 version %s [sample shell]\n", v8::V8::GetVersion());
 
-    std::shared_ptr<MD_V8Wrapper> runtime;
-    runtime = warpper_scope.getWrapper();
+    std::shared_ptr<MD_V8Wrapper> runtime(warpper_scope.getWrapper());
+    MD_V8Wrapper::s_curr_ = runtime.get();
 
     v8::Isolate* isolate = runtime->getIsolate();
     {

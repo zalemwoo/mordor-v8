@@ -67,9 +67,7 @@ protected:
     static void shutdown();
 
     static std::shared_ptr<MD_V8Wrapper> getWrapper(){
-        if(!s_curr_.get())
-            s_curr_ = std::make_shared<MD_V8Wrapper>("md_shell");
-        return s_curr_->shared_from_this();
+        return std::make_shared<MD_V8Wrapper>("md_shell");
     }
 
     static std::shared_ptr<Scheduler> sched_;
@@ -113,7 +111,7 @@ protected:
     static void Version(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 public:
-    static std::shared_ptr<MD_V8Wrapper> s_curr_;
+    static MD_V8Wrapper* s_curr_;
 private:
     std::string name_;
     v8::Handle<v8::Context> context_;
@@ -123,8 +121,8 @@ private:
     static bool s_inited_;
     static int s_argc_;
     static char** s_argv_;
-    static std::unique_ptr<v8::Platform> s_platform_;
     static std::unique_ptr<MD_Worker> s_worker_;
+    static v8::Platform* s_platform_;
 };
 
 } } // namespace Mordor::Test

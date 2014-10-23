@@ -1,11 +1,14 @@
 #ifndef MORDOR_CO_TASK_H_
 #define MORDOR_CO_TASK_H_
 
+#include "mordor/assert.h"
 #include "mordor/util.h"
 #include "mordor/coroutine.h"
 #include "mordor/fibersynchronization.h"
 
 #include "v8.h"
+
+#include "v8_persistent_wrapper.h"
 
 namespace Mordor
 {
@@ -17,51 +20,118 @@ struct DummyVoid;
 struct MdTaskAbortedException: virtual OperationAbortedException
 {
 };
+template<typename Result, typename... ARGS> class MD_Task;
 
-class Task
+template<typename Result>
+class TaskResult : Mordor::noncopyable
 {
 public:
-    Task(v8::Isolate* isolate) :
-            isolate(isolate)
+    void setResult(const Result &result)
     {
-        m_fiber = Fiber::ptr(new Fiber(std::bind(&Task::run, this)));
+        result_ = result;
     }
 
-    virtual ~Task()
+    Result getResult()
     {
-        // reset();
+        return result_;
+    }
+protected:
+    Result result_;
+};
+
+template<>
+class TaskResult<void>: Mordor::noncopyable
+{
+};
+
+template<typename T>
+class TaskResult<v8::Local<T>> : Mordor::noncopyable
+{
+public:
+    void setResult(const v8::Local<T> &result)
+    {
+        result_ = PersistentHandleWrapper<T>(v8::Isolate::GetCurrent(), result);
     }
 
-    void reset()
+    v8::Local<T> getResult()
     {
-        if (m_fiber->state() == Fiber::HOLD) {
-            try {
-                throw MdTaskAbortedException();
-            } catch (...) {
-                m_fiber->inject(std::current_exception());
-            }
-        }
-        m_fiber->reset(std::bind(&Task::run, this));
+        return result_.Extract();
     }
+protected:
+    PersistentHandleWrapper<T> result_;
+};
+
+
+template<typename Result, typename... ARGS>
+class TaskCallback : Mordor::noncopyable
+{
+public:
+    typedef MD_Task<Result, ARGS...> TaskType;
+    typedef std::function<void(TaskType&)> CallbackType;
+    TaskCallback(TaskType& task, CallbackType dg):task_ref(task), dg_(dg){}
+
+    void run(){
+        dg_(task_ref);
+    }
+
+private:
+    TaskType& task_ref;
+    CallbackType dg_;
+};
+
+template<typename Result>
+class TaskCallback<Result, const v8::FunctionCallbackInfo<v8::Value>&> : Mordor::noncopyable
+{
+public:
+    typedef MD_Task<Result, const v8::FunctionCallbackInfo<v8::Value>&> TaskType;
+    typedef std::function<void(TaskType&)> CallbackType;
+    TaskCallback(TaskType& task, CallbackType dg):task_ref(task), dg_(dg){}
+
+    void setIsolate(v8::Isolate* isolate){
+        this->isolate_ = isolate;
+    }
+
+    void run(){
+        MORDOR_ASSERT(this->isolate_ != NULL);
+        v8::Locker locker(isolate_);
+        v8::Isolate::Scope isolate_scope(isolate_);
+        v8::HandleScope handle_scope(isolate_);
+        dg_(task_ref);
+    }
+
+private:
+    TaskType& task_ref;
+    CallbackType dg_;
+    v8::Isolate* isolate_{NULL};
+};
+
+template<typename Result>
+class TaskCallback<Result, v8::Handle<v8::Value>> : public TaskCallback<Result, const v8::FunctionCallbackInfo<v8::Value>&>
+{
+public:
+    typedef MD_Task<Result, v8::Handle<v8::Value>> TaskType;
+    typedef std::function<void(TaskType&)> CallbackType;
+    TaskCallback(TaskType& task, CallbackType dg):TaskCallback<Result, const v8::FunctionCallbackInfo<v8::Value>&>(task,dg){}
+};
+
+class Task : Mordor::noncopyable
+{
+public:
+    virtual ~Task(){}
 
     void Call()
     {
-        m_fiber->call();
-    }
-
-    Fiber::State state() const
-    {
-        return m_fiber->state();
+        try {
+            this->run();
+        } catch (MdTaskAbortedException &) {
+        }
+        setEvent();
     }
 
     virtual void waitEvent()
     {
         event_.wait();
     }
-
-public:
-    v8::Isolate* isolate;
-
 protected:
     virtual void run() = 0;
 
@@ -71,181 +141,110 @@ protected:
     }
 
 protected:
-    Fiber::ptr m_fiber;
     Mordor::FiberEvent event_ { false };
 };
 
-template<class Result, class Arg = DummyVoid>
-class MD_Task: public Task, Mordor::noncopyable
+
+class Task_V8 : public Task
 {
 public:
-    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &, const Arg&)> dg, const Arg& arg) :
-            Task(isolate), m_dg(dg), m_arg(arg)
-    {
-        m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
-    }
+    Task_V8(v8::Isolate* isolate): Task(), isolate_(isolate){}
+    virtual ~Task_V8(){}
 
-    void setResult(const Result &result)
-    {
-        m_result = result;
-    }
-
-    const Result& getResult()
-    {
-        return m_result;
-    }
-private:
-    void run()
-    {
-        try {
-            m_dg(*this, m_arg);
-        } catch (MdTaskAbortedException &) {
-        }
-        setEvent();
-    }
-
-private:
-    std::function<void(MD_Task &, const Arg&)> m_dg;
-    Result m_result;
-    const Arg& m_arg;
-};
-
-template<class Result>
-class MD_Task<Result, DummyVoid> : public Task, Mordor::noncopyable
-{
-public:
-    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &)> dg) :
-            Task(isolate), m_dg(dg)
-    {
-        m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
-    }
-
-    void setResult(const Result &result)
-    {
-        m_result = result;
-    }
-
-    const Result & getResult()
-    {
-        return m_result;
-    }
-private:
-    void run()
-    {
-        try {
-            m_dg(*this);
-        } catch (MdTaskAbortedException &) {
-        }
-        setEvent();
-    }
-
-private:
-    std::function<void(MD_Task &)> m_dg;
-    Result m_result;
-};
-
-template<class Arg>
-class MD_Task<void, Arg> : public Task, Mordor::noncopyable
-{
-public:
-    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &, const Arg&)> dg, const Arg& arg) :
-            Task(isolate), m_dg(dg), m_arg(arg)
-    {
-        m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
-    }
-
-private:
-    void run()
-    {
-        try {
-            m_dg(*this, m_arg);
-        } catch (MdTaskAbortedException &) {
-        }
-        setEvent();
-    }
-
-private:
-    std::function<void(MD_Task &, const Arg&)> m_dg;
-    const Arg& m_arg;
-};
-
-
-template<class Result>
-class MD_Task<Result, const v8::FunctionCallbackInfo<v8::Value> &>: public Task, Mordor::noncopyable
-{
-public:
-    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &)> dg) :
-            Task(isolate), m_dg(dg)
-    {
-        m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
+    v8::Isolate* getIsolate(){
+        return isolate_;
     }
 
     virtual void waitEvent() override
     {
-        v8::Unlocker unlocker(isolate);
+        v8::Unlocker unlocker(isolate_);
         event_.wait();
     }
 
-    void setResult(const Result &result)
-    {
-        m_result = result;
-    }
-
-    const Result& getResult()
-    {
-        return m_result;
-    }
-private:
-    void run()
-    {
-        try {
-            v8::Locker locker(isolate);
-            v8::Isolate::Scope isolate_scope(isolate);
-            m_dg(*this);
-        } catch (MdTaskAbortedException &) {
-        }
-        setEvent();
-    }
-
-private:
-    std::function<void(MD_Task &)> m_dg;
-    Result m_result;
+protected:
+    v8::Isolate* isolate_;
 };
 
-template<>
-class MD_Task<void, const v8::FunctionCallbackInfo<v8::Value> &> : public Task, Mordor::noncopyable
+template<typename Result, typename... ARGS>
+class MD_Task : public Task
 {
 public:
-
-    MD_Task(v8::Isolate* isolate, std::function<void(MD_Task &)> dg) :
-            Task(isolate), m_dg(dg)
+    typedef typename TaskCallback<Result, ARGS...>::CallbackType CallbackType;
+public:
+    MD_Task(CallbackType dg) : Task(), dg_(*this, dg)
     {
-        m_fiber = Fiber::ptr(new Fiber(std::bind(&MD_Task::run, this)));
     }
 
-    virtual void waitEvent() override
-    {
-        v8::Unlocker unlocker(isolate);
-        event_.wait();
+    ~MD_Task(){}
+
+    template<typename R = Result>
+    void setResult(const R &result){
+        result_.setResult(result);
+    }
+    template<typename R = Result>
+    R getResult(){
+        return result_.getResult();
     }
 
-private:
-    void run()
+protected:
+    virtual void run()
     {
-        try {
-            v8::Locker locker(isolate);
-            v8::Isolate::Scope isolate_scope(isolate);
-            m_dg(*this);
-        } catch (MdTaskAbortedException &) {
-        }
-        setEvent();
+        dg_.run();
     }
-
-private:
-    std::function<void(MD_Task &)> m_dg;
+protected:
+    TaskCallback<Result, ARGS...> dg_;
+    TaskResult<Result> result_;
 };
 
-}
-}  // namespace Mordor::Test
+
+template<typename Result>
+class MD_Task<Result, const v8::FunctionCallbackInfo<v8::Value>&> : public Task_V8
+{
+public:
+    typedef typename TaskCallback<Result, const v8::FunctionCallbackInfo<v8::Value>&>::CallbackType CallbackType;
+public:
+    MD_Task(v8::Isolate* isolate, CallbackType dg) : Task_V8(isolate), dg_(*this, dg)
+    {
+        dg_.setIsolate(isolate);
+    }
+
+    ~MD_Task(){}
+
+    template<typename R = Result>
+    void setResult(const R &result){
+        result_.setResult(result);
+    }
+    template<typename R = Result>
+    R getResult(){
+        return result_.getResult();
+    }
+
+protected:
+    virtual void run()
+    {
+        dg_.run();
+    }
+protected:
+    TaskCallback<Result, const v8::FunctionCallbackInfo<v8::Value>&> dg_;
+    TaskResult<Result> result_;
+};
+
+template<typename Result>
+class MD_Task<Result, v8::Handle<v8::Value>> : public Task_V8
+{
+public:
+    typedef typename TaskCallback<Result, v8::Handle<v8::Value>>::CallbackType CallbackType;
+public:
+    MD_Task(v8::Isolate* isolate, CallbackType dg) : Task_V8(isolate), dg_(*this, dg)
+    {
+        dg_.setIsolate(isolate);
+    }
+
+private:
+    TaskCallback<Result, v8::Handle<v8::Value>> dg_;
+};
+
+
+} }  // namespace Mordor::Test
 
 #endif // MORDOR_CO_TASK_H_

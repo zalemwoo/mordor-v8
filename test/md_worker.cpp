@@ -26,7 +26,7 @@ MD_Worker* CreateWorker(int worker_pool_size)
     return mdWorker;
 }
 
-const int MD_Worker::kMaxWorkerPoolSize = 4;
+const int MD_Worker::kMaxWorkerThreadSize = 4;
 
 MD_Worker::MD_Worker() :
         initialized_(false), worker_pool_size_(0), worker_mutex_(), worker_cond_(worker_mutex_)
@@ -36,7 +36,7 @@ MD_Worker::MD_Worker() :
 MD_Worker::~MD_Worker()
 {
     std::lock_guard<std::mutex> scopeLock(lock_);
-    task_queue_.terminate();
+    stop();
 }
 
 void MD_Worker::setWorkerPoolSize(int worker_pool_size)
@@ -46,7 +46,7 @@ void MD_Worker::setWorkerPoolSize(int worker_pool_size)
     if (worker_pool_size < 1) {
         worker_pool_size = v8::base::SysInfo::NumberOfProcessors();
     }
-    worker_pool_size_ = std::max(std::min(worker_pool_size, kMaxWorkerPoolSize), 1);
+    worker_pool_size_ = std::max(std::min(worker_pool_size, kMaxWorkerThreadSize), 1);
 }
 
 void MD_Worker::ensureInitialized()
@@ -61,20 +61,26 @@ void MD_Worker::ensureInitialized()
     workers_.resize(worker_pool_size_);
 
     for (int i = 0; i < worker_pool_size_; ++i) {
-        workers_[i] = std::shared_ptr<Fiber>(new Fiber(std::bind(&MD_Worker::idle, this)));
+        workers_[i] = std::shared_ptr<Fiber>(new Fiber(std::bind(&MD_Worker::run, this)));
     }
 
     sched_->schedule(workers_.begin(), workers_.end());
-
 }
 
-void MD_Worker::idle()
+void MD_Worker::stop()
 {
+    MORDOR_ASSERT(Scheduler::getThis() != sched_.get());
+    task_queue_.terminate();
+    sched_->stop();
+}
+
+void MD_Worker::run()
+{
+    Task* task = NULL;
     while (true) {
-        Task* task = NULL;
         task = task_queue_.getNext();
         if (!task) return;
-        std::cout << "*** run on: " << Fiber::getThis() << std::endl;
+        std::cout << "*** run on: " << Fiber::getThis() << ", TID: " << Mordor::gettid() << std::endl;
         task->Call();
     }
 }
