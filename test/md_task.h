@@ -20,23 +20,23 @@ struct DummyVoid;
 struct MdTaskAbortedException: virtual OperationAbortedException
 {
 };
-template<typename Result, typename... ARGS> class MD_Task;
+template<typename TaskSignature> class MD_Task;
 
 template<typename Result>
 class TaskResult : Mordor::noncopyable
 {
 public:
-    void setResult(const Result &result)
+    void set(const Result &val)
     {
-        result_ = result;
+        val_ = val;
     }
 
-    Result getResult()
+    Result get()
     {
-        return result_;
+        return val_;
     }
 protected:
-    Result result_;
+    Result val_;
 };
 
 template<>
@@ -48,25 +48,26 @@ template<typename T>
 class TaskResult<v8::Local<T>> : Mordor::noncopyable
 {
 public:
-    void setResult(const v8::Local<T> &result)
+    void set(const v8::Local<T> &val)
     {
-        result_ = PersistentHandleWrapper<T>(v8::Isolate::GetCurrent(), result);
+        val_ = PersistentHandleWrapper<T>(v8::Isolate::GetCurrent(), val);
     }
 
-    v8::Local<T> getResult()
+    v8::Local<T> get()
     {
-        return result_.Extract();
+        return val_.Extract();
     }
 protected:
-    PersistentHandleWrapper<T> result_;
+    PersistentHandleWrapper<T> val_;
 };
 
+template<typename TaskSignature> class TaskCallback;
 
 template<typename Result, typename... ARGS>
-class TaskCallback : Mordor::noncopyable
+class TaskCallback<Result(ARGS...)> : Mordor::noncopyable
 {
 public:
-    typedef MD_Task<Result, ARGS...> TaskType;
+    typedef MD_Task<Result(ARGS...)> TaskType;
     typedef std::function<void(TaskType&)> CallbackType;
     TaskCallback(TaskType& task, CallbackType dg):task_ref(task), dg_(dg){}
 
@@ -80,10 +81,10 @@ private:
 };
 
 template<typename Result>
-class TaskCallback<Result, const v8::FunctionCallbackInfo<v8::Value>&> : Mordor::noncopyable
+class TaskCallback<Result(const v8::FunctionCallbackInfo<v8::Value>&)> : Mordor::noncopyable
 {
 public:
-    typedef MD_Task<Result, const v8::FunctionCallbackInfo<v8::Value>&> TaskType;
+    typedef MD_Task<Result(const v8::FunctionCallbackInfo<v8::Value>&)> TaskType;
     typedef std::function<void(TaskType&)> CallbackType;
     TaskCallback(TaskType& task, CallbackType dg):task_ref(task), dg_(dg){}
 
@@ -103,15 +104,6 @@ private:
     TaskType& task_ref;
     CallbackType dg_;
     v8::Isolate* isolate_{NULL};
-};
-
-template<typename Result>
-class TaskCallback<Result, v8::Handle<v8::Value>> : public TaskCallback<Result, const v8::FunctionCallbackInfo<v8::Value>&>
-{
-public:
-    typedef MD_Task<Result, v8::Handle<v8::Value>> TaskType;
-    typedef std::function<void(TaskType&)> CallbackType;
-    TaskCallback(TaskType& task, CallbackType dg):TaskCallback<Result, const v8::FunctionCallbackInfo<v8::Value>&>(task,dg){}
 };
 
 class Task : Mordor::noncopyable
@@ -166,10 +158,10 @@ protected:
 };
 
 template<typename Result, typename... ARGS>
-class MD_Task : public Task
+class MD_Task<Result(ARGS...)> : public Task
 {
 public:
-    typedef typename TaskCallback<Result, ARGS...>::CallbackType CallbackType;
+    typedef typename TaskCallback<Result(ARGS...)>::CallbackType CallbackType;
 public:
     MD_Task(CallbackType dg) : Task(), dg_(*this, dg)
     {
@@ -179,11 +171,11 @@ public:
 
     template<typename R = Result>
     void setResult(const R &result){
-        result_.setResult(result);
+        result_.set(result);
     }
     template<typename R = Result>
     R getResult(){
-        return result_.getResult();
+        return result_.get();
     }
 
 protected:
@@ -192,16 +184,16 @@ protected:
         dg_.run();
     }
 protected:
-    TaskCallback<Result, ARGS...> dg_;
+    TaskCallback<Result(ARGS...)> dg_;
     TaskResult<Result> result_;
 };
 
 
 template<typename Result>
-class MD_Task<Result, const v8::FunctionCallbackInfo<v8::Value>&> : public Task_V8
+class MD_Task<Result(const v8::FunctionCallbackInfo<v8::Value>&)> : public Task_V8
 {
 public:
-    typedef typename TaskCallback<Result, const v8::FunctionCallbackInfo<v8::Value>&>::CallbackType CallbackType;
+    typedef typename TaskCallback<Result(const v8::FunctionCallbackInfo<v8::Value>&)>::CallbackType CallbackType;
 public:
     MD_Task(v8::Isolate* isolate, CallbackType dg) : Task_V8(isolate), dg_(*this, dg)
     {
@@ -212,11 +204,11 @@ public:
 
     template<typename R = Result>
     void setResult(const R &result){
-        result_.setResult(result);
+        result_.set(result);
     }
     template<typename R = Result>
     R getResult(){
-        return result_.getResult();
+        return result_.get();
     }
 
 protected:
@@ -225,25 +217,9 @@ protected:
         dg_.run();
     }
 protected:
-    TaskCallback<Result, const v8::FunctionCallbackInfo<v8::Value>&> dg_;
+    TaskCallback<Result(const v8::FunctionCallbackInfo<v8::Value>&)> dg_;
     TaskResult<Result> result_;
 };
-
-template<typename Result>
-class MD_Task<Result, v8::Handle<v8::Value>> : public Task_V8
-{
-public:
-    typedef typename TaskCallback<Result, v8::Handle<v8::Value>>::CallbackType CallbackType;
-public:
-    MD_Task(v8::Isolate* isolate, CallbackType dg) : Task_V8(isolate), dg_(*this, dg)
-    {
-        dg_.setIsolate(isolate);
-    }
-
-private:
-    TaskCallback<Result, v8::Handle<v8::Value>> dg_;
-};
-
 
 } }  // namespace Mordor::Test
 

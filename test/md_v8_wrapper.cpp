@@ -205,7 +205,7 @@ v8::Handle<v8::Context> MD_V8Wrapper::createContext()
 }
 
 #if 0
-void co_execString(MD_Task<bool,v8::Handle<v8::String>> &self, v8::Handle<v8::String> source)
+void co_execString(MD_Task<bool(v8::Handle<v8::String>)> &self, v8::Handle<v8::String> source)
 {
     v8::Isolate* isolate = self.getIsolate();
     v8::Locker locker(isolate);
@@ -255,10 +255,9 @@ bool MD_V8Wrapper::execString(
         bool report_exceptions)
 {
 #if 0
-    MD_Task<bool,v8::Handle<v8::String>> task(isolate_, &co_execString, source);
-    v8::Unlocker unlocker(isolate_);
-    MD_V8Wrapper::s_worker_->doTask(&task);
-    return task.getResult();
+    bool result;
+    MD_V8Wrapper::s_worker_->doTask<bool,v8::Handle<v8::String>>(isolate_, std::bind(&co_execString, std::placeholders::_1, source), result);
+    return result;
 #else
     v8::HandleScope handle_scope(isolate_);
     v8::TryCatch try_catch;
@@ -302,7 +301,7 @@ bool MD_V8Wrapper::execString(
     return execString(src, print_result, report_exceptions);
 }
 
-static void co_print(MD_Task<void, const v8::FunctionCallbackInfo<v8::Value>& > &self, const v8::FunctionCallbackInfo<v8::Value>& args)
+static void co_print(MD_Task<void(const v8::FunctionCallbackInfo<v8::Value>&)> &self, const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     bool first = true;
     for (int i = 0; i < args.Length(); i++) {
@@ -346,7 +345,7 @@ void MD_V8Wrapper::Print(const v8::FunctionCallbackInfo<v8::Value>& args)
 #endif
 }
 
-static void co_read(MD_Task<v8::Local<v8::String>, const v8::FunctionCallbackInfo<v8::Value>& > &self, const v8::FunctionCallbackInfo<v8::Value>& args)
+static void co_read(MD_Task<v8::Local<v8::String>(const v8::FunctionCallbackInfo<v8::Value>&)> &self, const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     v8::Isolate* isolate = self.getIsolate();
     if (args.Length() != 1) {
@@ -418,7 +417,7 @@ void MD_V8Wrapper::Quit(const v8::FunctionCallbackInfo<v8::Value>& args)
     MD_V8Wrapper::s_curr_->running_ = false;
 }
 
-static void co_version(MD_Task<const char*, const v8::FunctionCallbackInfo<v8::Value>&> &self)
+static void co_version(MD_Task<const char*(const v8::FunctionCallbackInfo<v8::Value>&)> &self)
 {
     const char* ret = v8::V8::GetVersion();
     self.setResult(ret);

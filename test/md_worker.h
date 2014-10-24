@@ -30,26 +30,26 @@ class MD_Worker : Mordor::noncopyable{
   void stop();
 
   template <typename Result, typename... ARGS>
-  void doTask(v8::Isolate* isolate, const typename MD_Task<Result, ARGS...>::CallbackType& func, Result& ret)
+  void doTask(v8::Isolate* isolate, const typename MD_Task<Result(ARGS...)>::CallbackType& func, Result& ret)
   {
-      MD_Task<Result, ARGS...> task(isolate, func);
+      MD_Task<Result(ARGS...)> task(isolate, func);
       task_queue_.append(&task);
       task.waitEvent();
       ret = task.getResult();
   }
 
   template <typename Result, typename... ARGS>
-  void doTask(v8::Isolate* isolate, const typename MD_Task<void, ARGS...>::CallbackType& func)
+  void doTask(v8::Isolate* isolate, const typename MD_Task<void(ARGS...)>::CallbackType& func)
   {
-      MD_Task<void, ARGS...> task(isolate, func);
+      MD_Task<void(ARGS...)> task(isolate, func);
       task_queue_.append(&task);
       task.waitEvent();
   }
 
   template <typename Result>
-  void doTask(v8::Isolate* isolate, const typename MD_Task<Result>::CallbackType& func, Result& ret)
+  void doTask(v8::Isolate* isolate, const typename MD_Task<Result()>::CallbackType& func, Result& ret)
   {
-      MD_Task<Result> task(isolate, func);
+      MD_Task<Result()> task(isolate, func);
       task_queue_.append(&task);
       task.waitEvent();
       ret = task.getResult();
