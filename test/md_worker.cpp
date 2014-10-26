@@ -18,9 +18,9 @@ namespace Mordor
 namespace Test
 {
 
-MD_Worker* CreateWorker(int worker_pool_size)
+MD_Worker* CreateWorker(IOManager* sched, int worker_pool_size)
 {
-    MD_Worker* mdWorker = new MD_Worker();
+    MD_Worker* mdWorker = new MD_Worker(sched);
     mdWorker->setWorkerPoolSize(worker_pool_size);
     mdWorker->ensureInitialized();
     return mdWorker;
@@ -28,8 +28,8 @@ MD_Worker* CreateWorker(int worker_pool_size)
 
 const int MD_Worker::kMaxWorkerThreadSize = 4;
 
-MD_Worker::MD_Worker() :
-        initialized_(false), worker_pool_size_(0), worker_mutex_(), worker_cond_(worker_mutex_)
+MD_Worker::MD_Worker(IOManager* sched) :
+        initialized_(false), worker_pool_size_(0), sched_(sched)
 {
 }
 
@@ -56,8 +56,6 @@ void MD_Worker::ensureInitialized()
         return;
     initialized_ = true;
 
-    sched_ = std::make_shared<IOManager>(1, false);
-
     workers_.resize(worker_pool_size_);
 
     for (int i = 0; i < worker_pool_size_; ++i) {
@@ -69,9 +67,8 @@ void MD_Worker::ensureInitialized()
 
 void MD_Worker::stop()
 {
-    MORDOR_ASSERT(Scheduler::getThis() != sched_.get());
     task_queue_.terminate();
-    sched_->stop();
+    stop_lock_.wait();
 }
 
 void MD_Worker::run()
@@ -79,8 +76,13 @@ void MD_Worker::run()
     Task* task = NULL;
     while (true) {
         task = task_queue_.getNext();
-        if (!task) return;
-        std::cout << "*** run on: " << Fiber::getThis() << ", TID: " << Mordor::gettid() << std::endl;
+        if (!task){
+            if(termed_workers_++ == worker_pool_size_){
+                stop_lock_.notify();
+            }
+            return;
+        }
+        std::cout << "*** run on fiber:" << Fiber::getThis() << ", tid:" << Mordor::gettid() << std::endl << std::flush;
         task->Call();
     }
 }

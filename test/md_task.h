@@ -4,11 +4,12 @@
 #include "mordor/assert.h"
 #include "mordor/util.h"
 #include "mordor/coroutine.h"
+#include "mordor/semaphore.h"
 #include "mordor/fibersynchronization.h"
 
 #include "v8.h"
-
 #include "v8_persistent_wrapper.h"
+#include "md_v8_wrapper.h"
 
 namespace Mordor
 {
@@ -97,6 +98,8 @@ public:
         v8::Locker locker(isolate_);
         v8::Isolate::Scope isolate_scope(isolate_);
         v8::HandleScope handle_scope(isolate_);
+        v8::Local<v8::Context> context = MD_V8Wrapper::s_curr_->getContext();
+        v8::Context::Scope context_scope(context);
         dg_(task_ref);
     }
 
@@ -150,7 +153,7 @@ public:
     virtual void waitEvent() override
     {
         v8::Unlocker unlocker(isolate_);
-        event_.wait();
+        Task::waitEvent();
     }
 
 protected:

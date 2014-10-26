@@ -14,31 +14,35 @@ MD_TaskQueue::MD_TaskQueue() :
 
 MD_TaskQueue::~MD_TaskQueue()
 {
-    FiberMutex::ScopedLock lock(lock_);
-    MORDOR_ASSERT(terminated_);
-    MORDOR_ASSERT(task_queue_.empty());
+    {
+        FiberMutex::ScopedLock lock(lock_);
+        MORDOR_ASSERT(terminated_);
+        MORDOR_ASSERT(task_queue_.empty());
+    }
 }
 
 void MD_TaskQueue::append(Task* task)
 {
-    FiberMutex::ScopedLock lock(lock_);
-    MORDOR_ASSERT(!terminated_);
-    task_queue_.push(task);
+    {
+        FiberMutex::ScopedLock lock(lock_);
+        MORDOR_ASSERT(!terminated_);
+        task_queue_.push(task);
+    }
     condition_.signal();
 }
 
 Task* MD_TaskQueue::getNext()
 {
-    while(true){
+    while (true) {
         FiberMutex::ScopedLock lock(lock_);
+        if (!task_queue_.empty()) {
+            Task* task = task_queue_.front();
+            task_queue_.pop();
+            return task;
+        }
         if (terminated_) {
             condition_.broadcast();
             return NULL;
-        }
-        if (!task_queue_.empty()) {
-            Task* result = task_queue_.front();
-            task_queue_.pop();
-            return result;
         }
         condition_.wait();
     }
@@ -46,9 +50,11 @@ Task* MD_TaskQueue::getNext()
 
 void MD_TaskQueue::terminate()
 {
-    FiberMutex::ScopedLock lock(lock_);
-    MORDOR_ASSERT(!terminated_);
-    terminated_ = true;
+    {
+        FiberMutex::ScopedLock lock(lock_);
+        MORDOR_ASSERT(!terminated_);
+        terminated_ = true;
+    }
     condition_.broadcast();
 }
 

@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <readline/readline.h>
-#include <readline/history.h>
 #include <iostream>
 #include <functional>
 
@@ -16,7 +14,6 @@
 #include "mordor/coroutine.h"
 #include "mordor/streams/file.h"
 #include "mordor/streams/std.h"
-#include "mordor/streams/buffer.h"
 
 #include "v8.h"
 #include "md_v8_wrapper.h"
@@ -29,23 +26,24 @@ namespace Mordor
 namespace Test
 {
 
+LineEditor *LineEditor::current_ = NULL;
+
+LineEditor::LineEditor(Type type, const char* name)
+    : type_(type), name_(name) {
+  if (current_ == NULL || current_->type_ < type) current_ = this;
+}
+
+
 static void readScript(Coroutine<const char*>& self)
 {
-    atexit(clear_history);
-
-    Buffer buf;
-    char* line = NULL;
+    LineEditor* console = LineEditor::Get();
+    console->Open();
+    std:: string line;
     do {
-        buf.clear(true);
-        line = readline("> ");
-        if (!line)
-            break;
-        if (*line) {
-            add_history(line);
-            buf.copyIn(line);
-        }
-        free(line);
-        self.yield(buf.toString().c_str());
+        line = console->Prompt("> ");
+        if (line.empty())
+            continue;
+        self.yield(line.c_str());
     } while (true);
 }
 
@@ -92,6 +90,10 @@ void MD_Runner::run()
 
     fputs("bye.\n", stderr);
     runtime.reset();
+
+    LineEditor* line_editor = LineEditor::Get();
+    if (line_editor) line_editor->Close();
+
     sem_.notify();
 }
 

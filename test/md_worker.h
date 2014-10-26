@@ -10,6 +10,7 @@
 
 #include "v8.h"
 #include "mordor/fiber.h"
+#include "mordor/fibersynchronization.h"
 
 #include "md_task_queue.h"
 
@@ -21,7 +22,7 @@ namespace Test {
 
 class MD_Worker : Mordor::noncopyable{
  public:
-  MD_Worker();
+  MD_Worker(IOManager* sched);
   virtual ~MD_Worker();
 
   void setWorkerPoolSize(int worker_pool_size);
@@ -64,17 +65,14 @@ class MD_Worker : Mordor::noncopyable{
   std::mutex lock_;
   bool initialized_;
   int worker_pool_size_;
+  int termed_workers_{0};
+  FiberSemaphore stop_lock_{0};
   std::vector<std::shared_ptr<Fiber>> workers_;
-
-  std::shared_ptr<IOManager> sched_;
-
-  FiberMutex worker_mutex_;
-  FiberCondition worker_cond_;
-
+  IOManager* sched_;
   MD_TaskQueue task_queue_;
 };
 
-MD_Worker* CreateWorker(int worker_pool_size = 0);
+MD_Worker* CreateWorker(IOManager* sched, int worker_pool_size = 0);
 
 } }  // namespace Mordor::Test
 

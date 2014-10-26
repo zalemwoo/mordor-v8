@@ -19,6 +19,8 @@
 #include "v8/include/libplatform/libplatform.h"
 // #include "libplatform/libplatform.h"
 
+extern Mordor::IOManager* g_sched;
+
 /*
 static const char* g_harmony_opts = " --harmony --harmony_scoping --harmony_modules"
                            " --harmony_proxies --harmony_generators"
@@ -161,7 +163,7 @@ void MD_V8Wrapper::init(int argc, char** argv)
 
     v8::V8::InitializeICU();
     MD_V8Wrapper::s_platform_ = v8::platform::CreateDefaultPlatform(1);
-    MD_V8Wrapper::s_worker_.reset(CreateWorker(4));
+    MD_V8Wrapper::s_worker_.reset(CreateWorker(g_sched, 4));
 
     v8::V8::InitializePlatform(MD_V8Wrapper::s_platform_);
     v8::V8::Initialize();
