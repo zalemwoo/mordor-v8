@@ -25,6 +25,7 @@
         './md_runner.cpp',
         './md_readline.cpp',
         './md_shell.cpp',
+        './md_env.cpp',
         './md_v8_wrapper.cpp',
         './md_task_queue.cpp',
         './md_worker.cpp',

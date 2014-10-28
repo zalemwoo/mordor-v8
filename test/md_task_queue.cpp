@@ -14,11 +14,9 @@ MD_TaskQueue::MD_TaskQueue() :
 
 MD_TaskQueue::~MD_TaskQueue()
 {
-    {
-        FiberMutex::ScopedLock lock(lock_);
-        MORDOR_ASSERT(terminated_);
-        MORDOR_ASSERT(task_queue_.empty());
-    }
+    FiberMutex::ScopedLock lock(lock_);
+    MORDOR_ASSERT(terminated_);
+    MORDOR_ASSERT(task_queue_.empty());
 }
 
 void MD_TaskQueue::append(Task* task)
@@ -41,7 +39,7 @@ Task* MD_TaskQueue::getNext()
             return task;
         }
         if (terminated_) {
-            condition_.broadcast();
+            condition_.signal();
             return NULL;
         }
         condition_.wait();
@@ -58,5 +56,4 @@ void MD_TaskQueue::terminate()
     condition_.broadcast();
 }
 
-}
-}  // namespace Mordor::Test
+} }  // namespace Mordor::Test

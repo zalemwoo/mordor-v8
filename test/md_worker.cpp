@@ -18,7 +18,7 @@ namespace Mordor
 namespace Test
 {
 
-MD_Worker* CreateWorker(IOManager* sched, int worker_pool_size)
+MD_Worker* MD_Worker::New(Scheduler* sched, int worker_pool_size)
 {
     MD_Worker* mdWorker = new MD_Worker(sched);
     mdWorker->setWorkerPoolSize(worker_pool_size);
@@ -26,10 +26,9 @@ MD_Worker* CreateWorker(IOManager* sched, int worker_pool_size)
     return mdWorker;
 }
 
-const int MD_Worker::kMaxWorkerThreadSize = 4;
+const int MD_Worker::kMaxWorkerFiberSize = 4;
 
-MD_Worker::MD_Worker(IOManager* sched) :
-        initialized_(false), worker_pool_size_(0), sched_(sched)
+MD_Worker::MD_Worker(Scheduler* sched) : sched_(sched)
 {
 }
 
@@ -46,7 +45,7 @@ void MD_Worker::setWorkerPoolSize(int worker_pool_size)
     if (worker_pool_size < 1) {
         worker_pool_size = v8::base::SysInfo::NumberOfProcessors();
     }
-    worker_pool_size_ = std::max(std::min(worker_pool_size, kMaxWorkerThreadSize), 1);
+    worker_pool_size_ = std::max(std::min(worker_pool_size, kMaxWorkerFiberSize), 1);
 }
 
 void MD_Worker::ensureInitialized()
@@ -59,7 +58,7 @@ void MD_Worker::ensureInitialized()
     workers_.resize(worker_pool_size_);
 
     for (int i = 0; i < worker_pool_size_; ++i) {
-        workers_[i] = std::shared_ptr<Fiber>(new Fiber(std::bind(&MD_Worker::run, this)));
+        workers_[i] = Fiber::ptr(new Fiber(std::bind(&MD_Worker::run, this)));
     }
 
     sched_->schedule(workers_.begin(), workers_.end());
@@ -77,7 +76,7 @@ void MD_Worker::run()
     while (true) {
         task = task_queue_.getNext();
         if (!task){
-            if(termed_workers_++ == worker_pool_size_){
+            if(++termed_workers_ >= worker_pool_size_){
                 stop_lock_.notify();
             }
             return;

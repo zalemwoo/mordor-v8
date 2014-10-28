@@ -24,8 +24,7 @@
       'dependencies': [
         '../third_party/mordor-base/gyp/mordor.gyp:tests_base',
         '../third_party/mordor-base/gyp/mordor.gyp:cat',
-#        '../third_party/v8/src/d8.gyp:d8',
-#        '../third_party/v8/samples/samples.gyp:*',
+        '../third_party/v8/mordor_v8_patch/gen/d8.gyp:d8',
       ],
     },
     {

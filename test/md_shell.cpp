@@ -65,8 +65,6 @@ using namespace Mordor;
 int g_argc = 0;
 char** g_argv = NULL;
 
-IOManager* g_sched;
-
 MORDOR_MAIN(int argc, char* argv[])
 {
     Assertion::throwOnAssertion = true;
@@ -88,7 +86,6 @@ MORDOR_MAIN(int argc, char* argv[])
     int result = 0;
 
     IOManager pool(4);
-    g_sched = &pool;
 
     Mordor::Test::MD_Runner runner(pool);
 

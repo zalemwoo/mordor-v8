@@ -8,28 +8,28 @@
 
 namespace Mordor {
 
-
 namespace Test {
 
 class MD_V8Wrapper;
 
-class LineEditor {
- public:
-  enum Type { DUMB = 0, READLINE = 1 };
-  LineEditor(Type type, const char* name);
-  virtual ~LineEditor() { }
+class LineEditor
+{
+public:
+    enum Type { DUMB = 0, READLINE = 1 };
+    LineEditor(Type type, const char* name);
+    virtual ~LineEditor() { }
 
-  virtual std::string Prompt(const char* prompt) = 0;
-  virtual bool Open() { return true; }
-  virtual bool Close() { return true; }
-  virtual void AddHistory(const char* str) { }
+    virtual std::string Prompt(const char* prompt) = 0;
+    virtual bool Open() { return true; }
+    virtual bool Close() { return true; }
+    virtual void AddHistory(const char* str) { }
 
-  const char* name() { return name_; }
-  static LineEditor* Get() { return current_; }
- private:
-  Type type_;
-  const char* name_;
-  static LineEditor* current_;
+    const char* name() { return name_; }
+    static LineEditor* Get() { return current_; }
+private:
+    Type type_;
+    const char* name_;
+    static LineEditor* current_;
 };
 
 class MD_Runner
@@ -42,6 +42,10 @@ public:
 
     void wait(){
         sem_.wait();
+    }
+
+    void over(){
+        sem_.notify();
     }
 
 private:

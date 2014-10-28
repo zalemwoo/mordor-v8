@@ -100,5 +100,4 @@ void ReadLineEditor::AddHistory(const char* str)
     add_history(str);
 }
 
-}
-} // namespace Mordor::Test
+} } // namespace Mordor::Test
