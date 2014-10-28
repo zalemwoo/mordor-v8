@@ -38,7 +38,7 @@ inline void Environment::IsolateData::Put()
 inline Environment::IsolateData::IsolateData(v8::Isolate* isolate) :
         isolate_(isolate),
 #define V(PropertyName, StringValue)                                          \
-    PropertyName ## _(isolate, FIXED_ONE_BYTE_STRING(isolate, StringValue)),
+    PropertyName ## _(isolate, FIXED_UTF8_STRING(isolate, StringValue)),
     PER_ISOLATE_STRING_PROPERTIES(V)
 #undef V
         ref_count_(0)
@@ -90,6 +90,7 @@ inline Environment::Environment(v8::Local<v8::Context> context) :
         using_smalloc_alloc_cb_(false),
         using_domains_(false),
         printed_error_(false),
+        running_(true),
         context_(context->GetIsolate(), context)
 {
     // We'll be creating new objects so make sure we've entered the context.

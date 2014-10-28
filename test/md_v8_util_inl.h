@@ -73,6 +73,14 @@ inline v8::Local<TypeName> WeakPersistentToLocal(v8::Isolate* isolate, const v8:
     return v8::Local<TypeName>::New(isolate, persistent);
 }
 
+inline v8::Local<v8::String> Utf8String(v8::Isolate* isolate, const char* data, int length)
+{
+    return v8::String::NewFromUtf8(isolate,
+            data,
+            v8::String::kNormalString,
+            length);
+}
+
 inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate, const char* data, int length)
 {
     return v8::String::NewFromOneByte(isolate,

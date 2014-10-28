@@ -10,7 +10,6 @@
         '../third_party/mordor-base/gyp/mordor.gyp:mordor_base',
         '../third_party/v8/mordor_v8_patch/gen/v8.gyp:v8',
         '../third_party/v8/mordor_v8_patch/gen/v8.gyp:v8_libplatform',
-#'../libplatform/libplatform.gyp:mordor_libplatform',
       ],
       'include_dirs': [
         '.',
@@ -22,6 +21,7 @@
         '../third_party/v8/include',
       ],
       'sources': [
+        './js_objects/process.cpp',
         './md_runner.cpp',
         './md_readline.cpp',
         './md_shell.cpp',

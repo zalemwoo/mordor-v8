@@ -101,8 +101,6 @@ v8::Handle<v8::Context> MD_V8Wrapper::createContext(v8::Isolate* isolate)
     global->Set(toV8String(isolate, "read"), v8::FunctionTemplate::New(isolate, MD_V8Wrapper::Read));
     // Bind the global 'load' function to the C++ Load callback.
     global->Set(toV8String(isolate, "load"), v8::FunctionTemplate::New(isolate, MD_V8Wrapper::Load));
-    // Bind the 'quit' function
-    global->Set(toV8String(isolate, "q"), v8::FunctionTemplate::New(isolate, MD_V8Wrapper::Quit));
     // Bind the 'version' function
     global->Set(toV8String(isolate, "v"), v8::FunctionTemplate::New(isolate, MD_V8Wrapper::Version));
 
@@ -270,18 +268,6 @@ void MD_V8Wrapper::Load(const v8::FunctionCallbackInfo<v8::Value>& args)
             return;
         }
     }
-}
-
-// The callback that is invoked by v8 whenever the JavaScript 'quit'
-// function is called.  Quits.
-void MD_V8Wrapper::Quit(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-    // If not arguments are given args[0] will yield undefined which
-    // converts to the integer value 0.
-    // int exit_code = args[0]->Int32Value();
-    fflush(stdout);
-    fflush(stderr);
-    g_running = false;
 }
 
 static void co_version(MD_Task<const char*(TASK)> &self)

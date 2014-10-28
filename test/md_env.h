@@ -30,12 +30,21 @@ namespace Test
   V(error_string, "error")                                                    \
   V(path_string, "path")                                                      \
   V(syscall_string, "syscall")                                                \
+  V(physical_total_string, "physTotal")                                       \
+  V(heap_total_string, "heapTotal")                                           \
+  V(heap_total_exec_string, "heapExecTotal")                                  \
+  V(heap_used_string, "heapUsed")                                             \
+  V(heap_limit_string, "heapLimit")                                           \
+  V(message_string, "message")                                                \
+  V(processed_string, "processed")                                            \
+  V(stack_string, "stack")                                            \
 
 
 #define ENVIRONMENT_STRONG_PERSISTENT_PROPERTIES(V)                           \
   V(context, v8::Context)                                                     \
   V(binding_cache_object, v8::Object)                                         \
   V(module_load_list_array, v8::Array)                                        \
+  V(process_object, v8::Object)                                               \
 
 
 class MD_Worker;
@@ -70,6 +79,22 @@ public:
     inline void set_ ## PropertyName(v8::Local<TypeName> value);
     ENVIRONMENT_STRONG_PERSISTENT_PROPERTIES    (V)
 #undef V
+
+    inline bool running() const{
+        return running_;
+    }
+
+    inline void set_running(bool running){
+        this->running_ = running;
+    }
+
+    inline int return_value() const {
+        return return_value_;
+    }
+
+    inline void set_return_value(int ret_val) {
+        return_value_ = ret_val;
+    }
 
     inline bool using_smalloc_alloc_cb() const;
     inline void set_using_smalloc_alloc_cb(bool value);
@@ -115,6 +140,9 @@ private:
     bool using_smalloc_alloc_cb_;
     bool using_domains_;
     bool printed_error_;
+
+    bool running_;
+    int return_value_;
 
     std::unique_ptr<MD_Worker> worker_;
 

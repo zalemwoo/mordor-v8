@@ -59,7 +59,8 @@ bool ReadLineEditor::Open()
     rl_bind_key('\t', rl_complete);
     using_history();
     stifle_history(kMaxHistoryEntries);
-    return read_history(kHistoryFileName) == 0;
+//    return read_history(kHistoryFileName) == 0;
+    return true;
 }
 
 bool ReadLineEditor::Close()

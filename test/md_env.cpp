@@ -510,16 +510,16 @@ v8::Local<v8::Value> ErrnoException(v8::Isolate* isolate,
   v8::Local<v8::String> message = OneByteString(env->isolate(), msg);
 
   v8::Local<v8::String> cons1 =
-          v8::String::Concat(estring, FIXED_ONE_BYTE_STRING(env->isolate(), ", "));
+          v8::String::Concat(estring, FIXED_UTF8_STRING(env->isolate(), ", "));
   v8::Local<v8::String> cons2 = v8::String::Concat(cons1, message);
 
   if (path) {
     v8::Local<v8::String> cons3 =
-            v8::String::Concat(cons2, FIXED_ONE_BYTE_STRING(env->isolate(), " '"));
+            v8::String::Concat(cons2, FIXED_UTF8_STRING(env->isolate(), " '"));
     v8::Local<v8::String> cons4 =
             v8::String::Concat(cons3, v8::String::NewFromUtf8(env->isolate(), path));
     v8::Local<v8::String> cons5 =
-            v8::String::Concat(cons4, FIXED_ONE_BYTE_STRING(env->isolate(), "'"));
+            v8::String::Concat(cons4, FIXED_UTF8_STRING(env->isolate(), "'"));
     e = v8::Exception::Error(cons5);
   } else {
     e = v8::Exception::Error(cons2);

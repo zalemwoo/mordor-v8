@@ -34,6 +34,9 @@ namespace Test {
 #define FIXED_ONE_BYTE_STRING(isolate, string)                                \
   (Mordor::Test::OneByteString((isolate), (string), sizeof(string) - 1))
 
+#define FIXED_UTF8_STRING(isolate, string)                                \
+  (Mordor::Test::Utf8String((isolate), (string), sizeof(string) - 1))
+
 # define ASSERT(expression)  MORDOR_ASSERT(expression)
 # define CHECK(expression)   MORDOR_ASSERT(expression)
 
@@ -85,6 +88,11 @@ inline v8::Local<TypeName> WeakPersistentToLocal(
     v8::Isolate* isolate,
     const v8::Persistent<TypeName>& persistent);
 
+
+inline v8::Local<v8::String> Utf8String(v8::Isolate* isolate,
+                                        const char* data,
+                                        int length = -1);
+
 // Convenience wrapper around v8::String::NewFromOneByte().
 inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate,
                                            const char* data,
@@ -105,31 +113,6 @@ inline void ClearWrap(v8::Local<v8::Object> object);
 
 template <typename TypeName>
 inline TypeName* Unwrap(v8::Local<v8::Object> object);
-
-class Utf8Value {
-  public:
-    explicit Utf8Value(v8::Handle<v8::Value> value);
-
-    ~Utf8Value() {
-      free(str_);
-    }
-
-    char* operator*() {
-      return str_;
-    };
-
-    const char* operator*() const {
-      return str_;
-    };
-
-    size_t length() const {
-      return length_;
-    };
-
-  private:
-    size_t length_;
-    char* str_;
-};
 
 } } // namespace Mordor::Test
 
